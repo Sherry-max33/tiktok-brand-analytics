@@ -1,0 +1,48 @@
+nike:
+  - nike
+  - nikeshoes
+  - nikesneakers
+  - nikeair
+  - nikestyle
+  - nikeoutfit
+  - nikefit
+  - nikelook
+  - nikerunning
+  - nikebasketball
+  - niketraining
+  - niketiktok
+  - nikereview
+  - niketech
+
+adidas:
+  - adidas
+  - adidasshoes
+  - adidasoriginals
+  - adidasstyle
+  - adidasoutfit
+  - adidaslook
+  - adidasfootball
+  - adidasrunning
+  - adidastraining
+  - adidastiktok
+  - adidasreview
+  - adidassamba
+  - adidassambas
+  - adidasgazelle
+  - adidasgazelles
+  - adidasspezial
+  - adidasspezials
+
+normalize_tags:
+  adidassambas: adidassamba
+  adidasgazelles: adidasgazelle
+  adidasspezials: adidasspezial
+
+product_line_map:
+  niketech: tech
+  adidassamba: samba
+  adidasgazelle: gazelle
+  adidasspezial: spezial
+
+brand_style_map:
+  adidasoriginals: originals

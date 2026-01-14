@@ -1,0 +1,26 @@
+[project]
+name = "tiktok-brand-analytics"
+version = "0.1.0"
+description = "Sample-based TikTok analytics pipeline (Nike vs Adidas) with clean engineering structure."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "pandas>=2.0",
+  "pyyaml>=6.0",
+  "python-dotenv>=1.0",
+  "pyarrow>=14.0",
+  "tqdm>=4.66",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.6",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
