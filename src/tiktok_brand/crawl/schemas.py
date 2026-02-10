@@ -9,9 +9,10 @@ class VideoRecord:
     source_query: str        # username or seed hashtag
     seed_hashtag: Optional[str]
 
-    video_id: str
+    video_id: Optional[str]
     create_time_ts: Optional[int]
     caption_raw: Optional[str]
+    hashtags: List[str]
 
     author_id: Optional[str]
     author_username: Optional[str]
