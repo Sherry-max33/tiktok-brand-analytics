@@ -1,3 +1,66 @@
+"""
+Clean table: 将爬虫原始 VideoRecord 统一清洗成『语义事实表』。
+
+字段规则说明（未特别注明的列，都是从 raw 直接拷贝，不做变换，例如 platform/source_type/source_query/author_id 等）：
+
+- caption_raw
+  - 若 raw 中已有 caption_raw：原样保留。
+  - 若只有 caption：复制一列为 caption_raw。
+
+- hashtags
+  - 若 raw 已有 list 类型 hashtags：原样保留。
+  - 否则：从 caption_raw 中用 extract_hashtags 抽取，类型保证为 list[str]。
+
+- normalized_hashtags
+  - 对 hashtags 中每个标签，用 normalize_tags.py + configs/hashtags.yaml 的 normalize_tags 映射做归一化。
+
+- brand
+  - 若 raw.brand 非空：直接保留。
+  - 否则：对 normalized_hashtags 中的标签：
+    - 只出现 nike* → \"nike\"。
+    - 只出现 adidas* → \"adidas\"。
+    - 同时出现 nike* 和 adidas* → \"both\"。
+    - 都没有 → None。
+
+- seed_hashtag
+  - 当 source_type == \"hashtag\" 时：取 source_query 作为 seed_hashtag。
+  - 其他 source_type：为 None。
+
+- brand_style
+  - 对 normalized_hashtags 逐个标签，按 configs/hashtags.yaml.brand_style_map 做标签→风格映射。
+  - 遇到的第一个命中的标签返回其风格（performance/lifestyle/technical/retro 等）；无命中时为 None。
+
+- product_line
+  - 对 normalized_hashtags 逐个标签，按 configs/hashtags.yaml.product_line_map 做标签→产品线映射，
+    例如 niketech→tech_fleece、adidassamba→samba 等。
+  - 遇到的第一个命中的标签返回其产品线；无命中时为 None。
+
+- product_category
+  - 使用三层优先级 derive_product_category：
+    1) 若已有 product_line，先查 configs/hashtags.yaml.line_to_category_map（如 tech_fleece→apparel）。
+    2) 否则，对 normalized_hashtags 查 configs/hashtags.yaml.product_category_map（如 adidasshoes→shoes）。
+    3) 若仍为空，根据 caption_raw 文本关键词启发式：
+       - 命中 [\"fit\",\"wear\",\"outfit\",\"jacket\",\"shirt\",\"pants\",\"look\"] → \"apparel\"。
+       - 命中 [\"shoe\",\"sneaker\",\"kicks\",\"pair\"] → \"shoes\"。
+       - 否则 → \"uncategorized\"。
+
+- is_official_brand
+  - author_username 小写后是否在 configs/accounts.yaml.official_accounts 中配置为该品牌官方账号。
+
+- create_time
+  - 若存在 create_time_ts：使用项目时区 tz，将 Unix 秒转为 ISO 字符串。
+  - 否则为 NA。
+
+- engagement_count / engagement_rate
+  - 先把 view/like/comment/share/save_count 转为 numeric。
+  - engagement_count = like_count + comment_count + share_count + save_count（缺失视为 0）。
+  - engagement_rate = engagement_count / view_count；当 view_count<=0 时设为 NA。
+
+- 去重逻辑
+  - 按 crawled_at_ts 升序排序，同一 video_id 只保留最后一条记录（认为是最新快照）。
+  - raw_payload 列在 clean 表中直接删除。
+"""
+
 from __future__ import annotations
 import json
 from pathlib import Path
@@ -38,6 +101,8 @@ def build_clean_table(
     normalize_map = {k.lower(): v.lower() for k, v in (hashtags_cfg.get("normalize_tags") or {}).items()}
     product_map = {k.lower(): v for k, v in (hashtags_cfg.get("product_line_map") or {}).items()}
     style_map = {k.lower(): v for k, v in (hashtags_cfg.get("brand_style_map") or {}).items()}
+    category_map = {k.lower(): v for k, v in (hashtags_cfg.get("product_category_map") or {}).items()}
+    line_to_category = hashtags_cfg.get("line_to_category_map") or {}
 
     official_usernames = set()
     for brand, users in (accounts_cfg.get("official_accounts") or {}).items():
@@ -74,9 +139,20 @@ def build_clean_table(
             return "both"
         return None
 
-    df["brand"] = df["normalized_hashtags"].apply(infer_brand)
+    # Use raw brand when available, else infer from hashtags
+    inferred = df["normalized_hashtags"].apply(infer_brand)
+    if "brand" in df.columns:
+        df["brand"] = df["brand"].fillna(inferred)
+    else:
+        df["brand"] = inferred
 
-    # brand_style
+    # seed_hashtag: when source_type=hashtag, source_query is the hashtag
+    df["seed_hashtag"] = df.apply(
+        lambda r: r.get("source_query") if r.get("source_type") == "hashtag" else None,
+        axis=1,
+    )
+
+    # brand_style: configs/hashtags.yaml brand_style_map 做标签→风格映射
     def infer_style(tags):
         for t in (tags or []):
             if t.lower() in style_map:
@@ -93,6 +169,38 @@ def build_clean_table(
         return None
     df["product_line"] = df["normalized_hashtags"].apply(infer_product_line)
 
+    # product_category: 优先级
+    # 1) 已识别的 product_line → line_to_category_map
+    # 2) normalized_hashtags → product_category_map
+    # 3) caption 文本关键词启发式推断
+    def derive_product_category(row):
+        line = row.get("product_line")
+        hashtags = row.get("normalized_hashtags") or []
+        caption = str(row.get("caption_raw") or "").lower()
+
+        # 1. 从 Product Line 推断
+        if line in line_to_category:
+            return line_to_category[line]
+
+        # 2. 从 Hashtags 映射
+        for tag in hashtags:
+            t = str(tag).lower()
+            if t in category_map:
+                return category_map[t]
+
+        # 3. 关键词启发式推断 (Heuristic)
+        apparel_keywords = ["fit", "wear", "outfit", "jacket", "shirt", "pants", "look"]
+        if any(word in caption for word in apparel_keywords):
+            return "apparel"
+
+        shoes_keywords = ["shoe", "sneaker", "kicks", "pair"]
+        if any(word in caption for word in shoes_keywords):
+            return "shoes"
+
+        return "uncategorized"
+
+    df["product_category"] = df.apply(derive_product_category, axis=1)
+
     # official flag
     df["author_username"] = df.get("author_username")
     df["is_official_brand"] = df["author_username"].fillna("").str.lower().isin(official_usernames)
@@ -108,5 +216,9 @@ def build_clean_table(
     if "video_id" in df.columns:
         df = df.sort_values(by=["crawled_at_ts"], ascending=True)
         df = df.drop_duplicates(subset=["video_id"], keep="last")
+
+    # Drop raw_payload (not needed in clean table; Parquet can't serialize empty struct)
+    if "raw_payload" in df.columns:
+        df = df.drop(columns=["raw_payload"])
 
     return df

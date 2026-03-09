@@ -16,6 +16,7 @@ from typing import List, Dict, Any, Optional
 from TikTokApi import TikTokApi
 
 from tiktok_brand.common.time import now_iso_tz, now_ts
+from tiktok_brand.crawl.schemas import VideoRecord
 from tiktok_brand.common.logging import get_logger
 
 log = get_logger("tiktok_brand.crawl.hashtag_crawler")
@@ -71,23 +72,42 @@ def _extract_hashtags(video_data: Dict[str, Any]) -> List[str]:
     return hashtags
 
 
-def _create_video_record(video_data: Dict[str, Any], seed_hashtag: str, brand: str, tz_name: str) -> Dict[str, Any]:
+def _create_video_record(video_data: Dict[str, Any], seed_hashtag: str, brand: str, tz_name: str) -> VideoRecord:
     """
     Create a standardized video record from TikTok API data.
 
     This is the core mapping function that transforms raw API responses
-    into our internal schema for the raw data layer.
+    into our internal schema (VideoRecord) for the raw data layer.
     """
     # Extract basic video info
-    video_id = str(video_data.get('id', ''))
+    video_id_raw = video_data.get('id')
+    video_id = str(video_id_raw) if video_id_raw is not None else None
     create_time_ts = video_data.get('createTime')
 
     # Extract author info
     author = video_data.get('author', {})
-    author_username = author.get('unique_id') or author.get('nickname', '')
+    author_id_raw = author.get('id')
+    author_id = str(author_id_raw) if author_id_raw is not None else None
+    author_username = author.get('unique_id') or author.get('nickname')
     author_verified = author.get('verified', False)
+    author_signature = author.get('signature') or author.get('signatureDesc') or author.get('bio')
+    author_stats = video_data.get('authorStats') or author.get('stats') or {}
+    author_follower_count = author_stats.get('followerCount')
 
-    # Extract stats
+    # Video duration: video.duration (often in ms)
+    video_obj = video_data.get('video', {})
+    duration_raw = video_obj.get('duration')
+    if duration_raw is not None:
+        video_duration_sec = float(duration_raw) / 1000.0 if duration_raw > 100 else float(duration_raw)
+    else:
+        video_duration_sec = None
+
+    # Music: music.id or music.idStr; has_music = non-empty music with valid id
+    music_obj = video_data.get('music') or {}
+    music_id = music_obj.get('idStr') or music_obj.get('id')
+    if music_id is not None:
+        music_id = str(music_id)
+    has_music = bool(music_obj and music_id)
     stats = video_data.get('stats', {})
     view_count = stats.get('playCount')
     like_count = stats.get('diggCount')
@@ -96,45 +116,35 @@ def _create_video_record(video_data: Dict[str, Any], seed_hashtag: str, brand: s
     save_count = stats.get('collectCount')  # Bookmark/save count
 
     # Extract text content
-    caption_raw = video_data.get('desc', '')
+    caption_raw = video_data.get('desc')
     hashtags = _extract_hashtags(video_data)
 
-    # Create raw_min subset for debugging/analysis
-    raw_min = {
-        'id': video_data.get('id'),
-        'createTime': video_data.get('createTime'),
-        'author': {
-            'id': author.get('id'),
-            'unique_id': author.get('unique_id'),
-            'nickname': author.get('nickname'),
-            'verified': author.get('verified')
-        },
-        'stats': stats
-    }
-
-    # Build the complete record
-    record = {
-        'platform': 'tiktok',
-        'source_type': 'hashtag',
-        'brand': brand,
-        'seed_hashtag': seed_hashtag,
-        'video_id': video_id,
-        'create_time_ts': create_time_ts,
-        'caption_raw': caption_raw,
-        'hashtags': hashtags,
-        'author_username': author_username,
-        'author_verified': author_verified,
-        'view_count': view_count,
-        'like_count': like_count,
-        'comment_count': comment_count,
-        'share_count': share_count,
-        'save_count': save_count,
-        'crawled_at': now_iso_tz(tz_name),
-        'crawled_at_ts': now_ts(),
-        'raw_min': raw_min
-    }
-
-    return record
+    return VideoRecord(
+        platform='tiktok',
+        source_type='hashtag',
+        source_query=seed_hashtag,
+        brand=brand or None,
+        video_id=video_id,
+        create_time_ts=create_time_ts,
+        caption_raw=caption_raw,
+        hashtags=hashtags,
+        author_id=author_id,
+        author_username=author_username,
+        author_verified=author_verified,
+        author_follower_count=author_follower_count,
+        author_signature=author_signature,
+        video_duration_sec=video_duration_sec,
+        music_id=music_id,
+        has_music=has_music,
+        view_count=view_count,
+        like_count=like_count,
+        comment_count=comment_count,
+        share_count=share_count,
+        save_count=save_count,
+        crawled_at=now_iso_tz(tz_name),
+        crawled_at_ts=now_ts(),
+        raw_payload={},
+    )
 
 
 def _crawl_hashtag_with_retry(api: TikTokApi, hashtag: str, count: int, max_retries: int = 3) -> List[Any]:
@@ -157,8 +167,12 @@ def _crawl_hashtag_with_retry(api: TikTokApi, hashtag: str, count: int, max_retr
                 'id': f'mock_author_{i}',
                 'unique_id': f'user_{i}',
                 'nickname': f'User {i}',
-                'verified': i % 3 == 0  # Every 3rd user is verified
+                'verified': i % 3 == 0,
+                'signature': 'Fitness & sports content creator' if i % 3 == 0 else 'Lifestyle | fashion',
             },
+            'authorStats': {'followerCount': 10000 + (i * 1000)},
+            'video': {'duration': 15000 + (i * 1000)},  # ms
+            'music': {'id': f'mock_music_{i}', 'idStr': f'mock_music_{i}'} if i % 2 == 0 else {},
             'stats': {
                 'playCount': 1000 + (i * 500),
                 'diggCount': 50 + (i * 20),
@@ -225,9 +239,9 @@ def crawl_hashtag(seed_hashtag: str, count: int, tz_name: str, brand: str = "") 
             seen_video_ids.add(video_id)
 
             try:
-                # Convert to our standardized record format
+                # Convert to our standardized record format (VideoRecord schema)
                 record = _create_video_record(video_dict, seed_hashtag, brand, tz_name)
-                records.append(record)
+                records.append(record.to_dict())
 
                 log.debug(f"Processed video {i+1}/{len(videos)}: {video_id}")
 

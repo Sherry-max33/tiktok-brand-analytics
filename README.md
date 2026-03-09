@@ -120,7 +120,7 @@ Minimum columns expected in `data/processed/tiktok_videos.parquet`:
 - text: `caption_raw`, `hashtags`, `normalized_hashtags`
 - stats: `view_count`, `like_count`, `comment_count`, `share_count`, `save_count`
 - labels: `is_official_brand`, `author_verified`, `brand`, `brand_style`, `product_line`
-- derived: `engagement`, `engagement_rate`
+- derived: `engagement_count`, `engagement_rate`
 
 ---
 
