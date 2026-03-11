@@ -1,44 +1,11 @@
 nike:
+  # 为了小规模测试，只保留少量种子；后续可以再扩展
   - nike
-  - nikeshoes
-  - nikesneakers
-  - nikeair
-  - nikestyle
-  - nikeoutfit
-  - nikefit
-  - nikelook
-  - nikerunning
-  - nikebasketball
-  - niketraining
-  - niketiktok
-  - nikereview
-  - niketech
   - jordan
-  - airmax
-  - af1
-  - nikedunk
-  - airforce1
 
 adidas:
   - adidas
-  - adidasshoes
-  - adidasoriginals
-  - adidasstyle
-  - adidasoutfit
-  - adidaslook
-  - adidasfootball
-  - adidasrunning
-  - adidastraining
-  - adidastiktok
-  - adidasreview
   - adidassamba
-  - adidassambas
-  - adidasgazelle
-  - adidasgazelles
-  - adidasspezial
-  - adidasspezials
-  - ultraboost
-  - adidasforum
 
 normalize_tags:
   adidassambas: adidassamba
