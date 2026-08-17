@@ -13,7 +13,10 @@ def main() -> None:
     project_cfg = yaml.safe_load(Path("configs/project.yaml").read_text(encoding="utf-8"))
     accounts_cfg = yaml.safe_load(Path("configs/accounts.yaml").read_text(encoding="utf-8"))
     tz = project_cfg["time"]["timezone"]
-    per_user = project_cfg["sampling"]["per_user"]
+    per_user = project_cfg["sampling"].get(
+        "videos_per_keyword_target",
+        project_cfg["sampling"].get("per_user", 200),
+    )
     raw_dir = Path(project_cfg["output"]["raw_dir"])
     raw_dir.mkdir(parents=True, exist_ok=True)
 

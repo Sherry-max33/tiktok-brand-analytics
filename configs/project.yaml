@@ -4,9 +4,9 @@ sampling:
   window_days: 30                # Research API 视频查询强制要求 ≤30 天窗口切分
 
   # 1. 广度探索：整体抓取目标
-  total_videos_target: 24000     # 对应截图：视频总量约 19,200 - 24,000
-  keywords_target: 30            # 对应截图：24–30 个 hashtag (Nike+Adidas)
-  videos_per_keyword_target: 800 # 计算逻辑：24000 / 30
+  total_videos_target: 6000      # 视频总量 6k
+  keywords_target: 30            # 24–30 个 hashtag + user (Nike+Adidas)
+  videos_per_keyword_target: 200  # 计算逻辑：6000 / 30
 
   # 2. 深度挖掘：评论采样方案 (方案 A)
   # 截图建议选 1200 个候选，以最终保证拿到 1000 个合格视频的评论
@@ -26,6 +26,10 @@ api_limits:
   # 截图底部的 API 配额限制
   requests_per_day: 1000
   daily_reset_utc_hour: 0        # 每天 0 点 UTC 重置
+
+apify:
+  actor_id: clockworks/tiktok-scraper
+  scrape_additional_author_meta: true
 
 output:
   raw_dir: data/raw

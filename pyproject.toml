@@ -10,8 +10,8 @@ dependencies = [
   "python-dotenv>=1.0",
   "pyarrow>=14.0",
   "tqdm>=4.66",
-  "TikTokApi>=6.2.0",
   "tenacity>=8.0",
+  "apify-client>=1.6.0",
 ]
 
 [project.optional-dependencies]

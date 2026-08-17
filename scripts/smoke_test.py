@@ -5,7 +5,7 @@ Smoke test: 小规模爬虫 + 全链路 ETL + 关键字段校验。
   python scripts/smoke_test.py
 
 - 先用 configs/hashtags.yaml 里当前 seed 爬一小批（per_hashtag=50）。
-  目前仍是 mock；接上真实 TikTok API 后，同一条命令即对真数据做 smoke test。
+  无 APIFY_API_TOKEN 时用 Apify 格式的 mock；有 token 时走真实 Apify crawl。
 - 再跑 raw → clean → feature，并检查：
   - 必要列存在、行数>0
   - brand / product_category / engagement_rate 等非全空、取值合理

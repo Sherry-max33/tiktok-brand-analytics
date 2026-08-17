@@ -19,8 +19,8 @@ def run_hashtag_crawl(per_hashtag: int = 40) -> None:
     """
     小规模测试用：根据当前 configs/hashtags.yaml 爬少量 hashtag 视频。
 
-    注意：hashtag_crawler 里仍使用 mock 数据结构，这里只是验证 ETL/字段映射是否跑通。
-    换成真实 TikTok API 后，这个脚本仍然可用。
+    无 APIFY_API_TOKEN 时用 Apify 格式 mock；有 token 时走真实 crawl。
+    输出 JSONL 与 data/raw 现有格式一致。
     """
     crawl_hashtags_from_config(per_hashtag=per_hashtag)
 
@@ -62,7 +62,7 @@ def run_etl() -> None:
 
 
 if __name__ == "__main__":
-    # 1) 小规模爬 4 个 seed，每个最多 40 条（mock 里最多 5 条）
+    # 1) 小规模爬 seed（mock 或 Apify），每个最多 40 条
     run_hashtag_crawl(per_hashtag=40)
     # 2) 跑一遍 clean → feature 并打印结果
     run_etl()
