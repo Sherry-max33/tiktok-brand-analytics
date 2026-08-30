@@ -1,8 +1,7 @@
 """
-Hashtag crawler: Apify clockworks/tiktok-scraper → VideoRecord → JSONL.
+Video hashtag crawler: Apify → VideoRecord → JSONL.
 
-Raw layer contract: one JSON object per line in data/raw/*.jsonl.
-When APIFY_API_TOKEN is unset, uses Apify-shaped mock items for smoke tests.
+Raw layer: field-name mapping only; normalization happens in clean ETL.
 """
 
 from __future__ import annotations
@@ -13,11 +12,11 @@ from typing import Any, Dict, List
 
 from tiktok_brand.common.logging import get_logger
 from tiktok_brand.common.time import now_ts
-from tiktok_brand.crawl.apify_client import fetch_hashtag_videos, get_apify_token
-from tiktok_brand.crawl.apify_mapper import apify_item_to_video_record
-from tiktok_brand.crawl.mock_items import mock_hashtag_items
+from tiktok_brand.crawl.apify_video_client import fetch_hashtag_videos, get_apify_token
+from tiktok_brand.crawl.apify_video_mapper import apify_video_item_to_record
+from tiktok_brand.crawl.mock_video_items import mock_hashtag_video_items
 
-log = get_logger("tiktok_brand.crawl.hashtag_crawler")
+log = get_logger("tiktok_brand.crawl.video_hashtag_crawler")
 
 
 def _fetch_hashtag_items(hashtag: str, count: int, max_retries: int = 3) -> List[Dict[str, Any]]:
@@ -40,14 +39,14 @@ def _fetch_hashtag_items(hashtag: str, count: int, max_retries: int = 3) -> List
         return []
 
     log.info(
-        "Using mock Apify items for hashtag '%s' (set APIFY_API_TOKEN for live crawl)",
+        "Using mock Apify video items for hashtag '%s' (set APIFY_API_TOKEN for live crawl)",
         hashtag,
     )
-    return mock_hashtag_items(hashtag, count)
+    return mock_hashtag_video_items(hashtag, count)
 
 
 def crawl_hashtag(seed_hashtag: str, count: int, tz_name: str, brand: str = "") -> List[Dict[str, Any]]:
-    log.info("Starting crawl for hashtag '%s' (target: %s videos)", seed_hashtag, count)
+    log.info("Starting video crawl for hashtag '%s' (target: %s)", seed_hashtag, count)
 
     records: List[Dict[str, Any]] = []
     seen_video_ids: set[str] = set()
@@ -58,8 +57,6 @@ def crawl_hashtag(seed_hashtag: str, count: int, tz_name: str, brand: str = "") 
             log.warning("No videos found for hashtag '%s'", seed_hashtag)
             return records
 
-        log.info("Retrieved %s Apify items for hashtag '%s'", len(items), seed_hashtag)
-
         for i, item in enumerate(items):
             video_id = str(item.get("id", ""))
             if not video_id or video_id in seen_video_ids:
@@ -67,7 +64,7 @@ def crawl_hashtag(seed_hashtag: str, count: int, tz_name: str, brand: str = "") 
             seen_video_ids.add(video_id)
 
             try:
-                record = apify_item_to_video_record(
+                record = apify_video_item_to_record(
                     item,
                     source_type="hashtag",
                     source_query=seed_hashtag,
@@ -83,10 +80,10 @@ def crawl_hashtag(seed_hashtag: str, count: int, tz_name: str, brand: str = "") 
                 time.sleep(0.6 + random.random() * 0.6)
 
     except Exception as exc:
-        log.error("Error during hashtag crawl for '%s': %s", seed_hashtag, exc)
+        log.error("Error during hashtag video crawl for '%s': %s", seed_hashtag, exc)
         return records
 
-    log.info("Completed crawl for hashtag '%s': %s records collected", seed_hashtag, len(records))
+    log.info("Completed hashtag video crawl for '%s': %s records", seed_hashtag, len(records))
     return records
 
 
@@ -95,8 +92,6 @@ def crawl_hashtags_from_config(per_hashtag: int = 200) -> None:
     from pathlib import Path
 
     from tiktok_brand.common.io import write_jsonl
-
-    log.info("Starting hashtag crawl from config")
 
     project_cfg = yaml.safe_load(Path("configs/project.yaml").read_text(encoding="utf-8"))
     hashtags_cfg = yaml.safe_load(Path("configs/hashtags.yaml").read_text(encoding="utf-8"))
@@ -107,22 +102,15 @@ def crawl_hashtags_from_config(per_hashtag: int = 200) -> None:
 
     total_records = 0
     for brand in ["nike", "adidas"]:
-        brand_tags = hashtags_cfg.get(brand, [])
-        log.info("Crawling %s hashtags for brand '%s'", len(brand_tags), brand)
-
-        for tag in brand_tags:
+        for tag in hashtags_cfg.get(brand, []):
             try:
                 records = crawl_hashtag(seed_hashtag=tag, count=per_hashtag, tz_name=tz, brand=brand)
                 if records:
-                    timestamp = now_ts()
-                    out_path = raw_dir / f"tiktok_hashtag_{brand}_{tag}_{timestamp}.jsonl"
+                    out_path = raw_dir / f"tiktok_hashtag_{brand}_{tag}_{now_ts()}.jsonl"
                     write_jsonl(out_path, records)
                     log.info("Wrote %s records to %s", len(records), out_path)
                     total_records += len(records)
-                else:
-                    log.warning("No records collected for hashtag '%s'", tag)
             except Exception as exc:
                 log.error("Failed to crawl hashtag '%s': %s", tag, exc)
-                continue
 
-    log.info("Hashtag crawl completed: %s total records across all hashtags", total_records)
+    log.info("Hashtag video crawl completed: %s total records", total_records)

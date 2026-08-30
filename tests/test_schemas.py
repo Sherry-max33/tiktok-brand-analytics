@@ -7,7 +7,7 @@ def test_video_record_to_dict():
         author_id=None, author_username=None, author_verified=None,
         author_follower_count=None, author_signature=None,
         video_duration_sec=None, music_id=None, has_music=False,
-        view_count=None, like_count=None, comment_count=None, share_count=None, save_count=None,
+        view_count=None, like_count=None, comment_count=None, share_count=None, collect_count=None,
         crawled_at="2026-01-06T00:00:00-05:00", crawled_at_ts=0,
         raw_payload={},
     )

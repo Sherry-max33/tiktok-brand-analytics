@@ -1,7 +1,5 @@
 """
-User crawler: Apify clockworks/tiktok-scraper → VideoRecord → JSONL.
-
-source_type='user', source_query=username. Same JSONL contract as hashtag_crawler.
+Video user crawler: Apify → VideoRecord → JSONL.
 """
 
 from __future__ import annotations
@@ -11,11 +9,11 @@ import time
 from typing import Any, Dict, List, Optional
 
 from tiktok_brand.common.logging import get_logger
-from tiktok_brand.crawl.apify_client import fetch_user_videos, get_apify_token
-from tiktok_brand.crawl.apify_mapper import apify_item_to_video_record
-from tiktok_brand.crawl.mock_items import mock_user_items
+from tiktok_brand.crawl.apify_video_client import fetch_user_videos, get_apify_token
+from tiktok_brand.crawl.apify_video_mapper import apify_video_item_to_record
+from tiktok_brand.crawl.mock_video_items import mock_user_video_items
 
-log = get_logger("tiktok_brand.crawl.user_crawler")
+log = get_logger("tiktok_brand.crawl.video_user_crawler")
 
 
 def _fetch_user_items(username: str, count: int, max_retries: int = 3) -> List[Dict[str, Any]]:
@@ -38,10 +36,10 @@ def _fetch_user_items(username: str, count: int, max_retries: int = 3) -> List[D
         return []
 
     log.info(
-        "Using mock Apify items for user '%s' (set APIFY_API_TOKEN for live crawl)",
+        "Using mock Apify video items for user '%s' (set APIFY_API_TOKEN for live crawl)",
         username,
     )
-    return mock_user_items(username, count)
+    return mock_user_video_items(username, count)
 
 
 def crawl_user(
@@ -50,7 +48,7 @@ def crawl_user(
     tz_name: str,
     brand: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    log.info("Starting crawl for user '%s' (target: %s videos)", username, count)
+    log.info("Starting video crawl for user '%s' (target: %s)", username, count)
 
     records: List[Dict[str, Any]] = []
     seen: set[str] = set()
@@ -58,10 +56,7 @@ def crawl_user(
     try:
         items = _fetch_user_items(username, count)
         if not items:
-            log.warning("No videos found for user '%s'", username)
             return records
-
-        log.info("Retrieved %s Apify items for user '%s'", len(items), username)
 
         for i, item in enumerate(items):
             video_id = str(item.get("id", ""))
@@ -70,7 +65,7 @@ def crawl_user(
             seen.add(video_id)
 
             try:
-                record = apify_item_to_video_record(
+                record = apify_video_item_to_record(
                     item,
                     source_type="user",
                     source_query=username,
@@ -86,8 +81,7 @@ def crawl_user(
                 time.sleep(0.6 + random.random() * 0.6)
 
     except Exception as exc:
-        log.error("Error during user crawl for '%s': %s", username, exc)
-        return records
+        log.error("Error during user video crawl for '%s': %s", username, exc)
 
-    log.info("Completed crawl for user '%s': %s records", username, len(records))
+    log.info("Completed user video crawl for '%s': %s records", username, len(records))
     return records

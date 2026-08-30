@@ -9,7 +9,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, 'src')
 
-from tiktok_brand.crawl.hashtag_crawler import crawl_hashtag
+from tiktok_brand.crawl.video_hashtag_crawler import crawl_hashtag
 from tiktok_brand.common.io import write_jsonl
 from tiktok_brand.common.time import now_ts
 

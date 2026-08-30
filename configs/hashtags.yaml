@@ -121,3 +121,20 @@ line_to_category_map:
   forum: shoes
   originals_apparel: apparel
   tracksuit: apparel
+
+accessories_keywords:
+  - bag
+  - backpack
+  - socks
+  - sock
+  - hat
+  - cap
+  - beanie
+  - watch
+  - glasses
+  - accessory
+  - accessories
+  - duffel
+  - belt
+  - glove
+  - gloves

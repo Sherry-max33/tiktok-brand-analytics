@@ -4,7 +4,7 @@ import yaml
 
 from tiktok_brand.common.io import write_jsonl
 from tiktok_brand.common.logging import get_logger
-from tiktok_brand.crawl.user_crawler import crawl_user
+from tiktok_brand.crawl.video_user_crawler import crawl_user
 from tiktok_brand.common.time import now_ts
 
 log = get_logger("scripts.crawl_users")

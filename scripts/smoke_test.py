@@ -22,7 +22,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from tiktok_brand.crawl.hashtag_crawler import crawl_hashtags_from_config
+from tiktok_brand.crawl.video_hashtag_crawler import crawl_hashtags_from_config
 from tiktok_brand.etl.build_clean_table import build_clean_table
 from tiktok_brand.etl.feature_table import build_feature_table
 

@@ -52,8 +52,8 @@ Clean table: 将爬虫原始 VideoRecord 统一清洗成『语义事实表』。
   - 否则为 NA。
 
 - engagement_count / engagement_rate
-  - 先把 view/like/comment/share/save_count 转为 numeric。
-  - engagement_count = like_count + comment_count + share_count + save_count（缺失视为 0）。
+  - 先把 view/like/comment/share/collect_count 转为 numeric。
+  - engagement_count = like_count + comment_count + share_count + collect_count（缺失视为 0）。
   - engagement_rate = engagement_count / view_count；当 view_count<=0 时设为 NA。
 
 - 去重逻辑
@@ -111,19 +111,43 @@ def build_clean_table(
 
     rows: List[Dict[str, Any]] = []
     for p in raw_paths:
+        name = Path(p).name.lower()
+        if "comments" in name or "comment_" in name:
+            continue
         rows.extend(read_jsonl(p))
 
     df = pd.DataFrame(rows)
+
+    # Legacy raw harmonization (old JSONL used save_count)
+    if "collect_count" not in df.columns and "save_count" in df.columns:
+        df["collect_count"] = df["save_count"]
 
     # Basic harmonization
     if "caption_raw" not in df.columns and "caption" in df.columns:
         df["caption_raw"] = df["caption"]
 
+    if "caption_raw" in df.columns:
+        df["caption_raw"] = df["caption_raw"].apply(
+            lambda x: x.strip() if isinstance(x, str) else x
+        )
+
     # Extract hashtags if missing
     if "hashtags" not in df.columns:
         df["hashtags"] = df["caption_raw"].fillna("").map(extract_hashtags)
 
-    df["hashtags"] = df["hashtags"].apply(lambda x: x if isinstance(x, list) else [])
+    def _clean_hashtag_list(tags: Any) -> List[str]:
+        if not isinstance(tags, list):
+            return []
+        seen: set[str] = set()
+        out: List[str] = []
+        for item in tags:
+            t = str(item).strip().lstrip("#").lower()
+            if t and t not in seen:
+                seen.add(t)
+                out.append(t)
+        return out
+
+    df["hashtags"] = df["hashtags"].apply(_clean_hashtag_list)
     df["normalized_hashtags"] = df["hashtags"].apply(lambda tags: normalize_hashtags(tags, normalize_map))
 
     # Brand label (simple: if any nike* tag then nike; if any adidas* tag then adidas; else null)
@@ -196,6 +220,16 @@ def build_clean_table(
         shoes_keywords = ["shoe", "sneaker", "kicks", "pair"]
         if any(word in caption for word in shoes_keywords):
             return "shoes"
+
+        accessories_keywords = [
+            str(k).lower()
+            for k in (hashtags_cfg.get("accessories_keywords") or [])
+        ]
+        if any(word in caption for word in accessories_keywords):
+            return "accessories"
+        for tag in hashtags:
+            if str(tag).lower() in accessories_keywords:
+                return "accessories"
 
         return "uncategorized"
 

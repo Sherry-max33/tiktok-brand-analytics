@@ -1,4 +1,4 @@
-"""Apify clockworks/tiktok-scraper client for hashtag and profile crawls."""
+"""Apify clockworks/tiktok-scraper client for video (hashtag/profile) crawls."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 
 from tiktok_brand.common.logging import get_logger
 
-log = get_logger("tiktok_brand.crawl.apify_client")
+log = get_logger("tiktok_brand.crawl.apify_video_client")
 
 DEFAULT_ACTOR_ID = "clockworks/tiktok-scraper"
 DEFAULT_RESULTS_PER_PAGE = 200

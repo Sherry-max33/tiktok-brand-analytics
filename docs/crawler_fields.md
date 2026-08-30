@@ -3,7 +3,7 @@
 研究目标：Nike vs Adidas 品牌热度对比、内容策略验证、互动与创作者分析。  
 下游：clean table（语义事实）→ feature table（分析/建模特征）。
 
-以下为 **Apify clockworks/tiktok-scraper** 经 `apify_mapper` 映射后必须或建议提供的字段（`VideoRecord` / feature table 一一对应）。  
+以下为 **Apify clockworks/tiktok-scraper** 经 `apify_video_mapper` 映射后必须或建议提供的字段（`VideoRecord` / feature table 一一对应）。  
 Raw 层落盘格式：**JSONL**（`data/raw/*.jsonl`，每行一个 JSON 对象）。
 
 ---
@@ -22,7 +22,7 @@ Raw 层落盘格式：**JSONL**（`data/raw/*.jsonl`，每行一个 JSON 对象�
 | **like_count** | int | 点赞 | like_count, engagement_count, comment_to_like_ratio |
 | **comment_count** | int | 评论 | comment_count, engagement_count |
 | **share_count** | int | 分享 | share_count, engagement_count |
-| **save_count** | int | 收藏，参与 engagement 计算 | save_count, engagement_count |
+| **collect_count** | int | 收藏（Apify `collectCount`），参与 engagement 计算 | collect_count, engagement_count |
 | **source_type** | str | `hashtag` \| `user`，数据来源 | source_type, seed_hashtag |
 | **source_query** | str | 种子 hashtag 或 username | source_query, seed_hashtag |
 | **crawled_at** | str (ISO) | 抓取时间 | crawled_at, crawl_at |
@@ -70,7 +70,7 @@ Raw 层落盘格式：**JSONL**（`data/raw/*.jsonl`，每行一个 JSON 对象�
 
 ## 五、Apify 字段映射
 
-Actor 输出经 `apify_mapper.py` 映射到 VideoRecord：
+Actor 视频输出经 `apify_video_mapper.py` 映射到 VideoRecord：
 
 - `id` → **video_id**
 - `createTime` → **create_time_ts**
@@ -80,7 +80,8 @@ Actor 输出经 `apify_mapper.py` 映射到 VideoRecord：
 - `authorMeta.signature` → **author_signature**
 - `authorMeta.verified` → **author_verified**
 - `authorMeta.fans` → **author_follower_count**
-- `playCount` / `diggCount` / `commentCount` / `shareCount` / `collectCount` → 互动指标
+- `playCount` / `diggCount` / `commentCount` / `shareCount` → 互动指标
+- `collectCount` → **collect_count**
 - `videoMeta.duration` → **video_duration_sec**（秒）
 - `musicMeta.musicId` → **music_id**；非空 → **has_music**
 

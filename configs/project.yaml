@@ -29,6 +29,7 @@ api_limits:
 
 apify:
   actor_id: clockworks/tiktok-scraper
+  comment_actor_id: clockworks/tiktok-comments-scraper
   scrape_additional_author_meta: true
 
 output:

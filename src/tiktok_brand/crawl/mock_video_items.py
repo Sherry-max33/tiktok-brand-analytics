@@ -1,4 +1,4 @@
-"""Apify-shaped mock items for local smoke tests (no API token required)."""
+"""Apify-shaped mock video items for local smoke tests."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import time
 from typing import Any, Dict, List
 
 
-def mock_hashtag_items(hashtag: str, count: int) -> List[Dict[str, Any]]:
+def mock_hashtag_video_items(hashtag: str, count: int) -> List[Dict[str, Any]]:
     tag = hashtag.lstrip("#")
     items: List[Dict[str, Any]] = []
     for i in range(min(count, 5)):
@@ -37,7 +37,7 @@ def mock_hashtag_items(hashtag: str, count: int) -> List[Dict[str, Any]]:
     return items
 
 
-def mock_user_items(username: str, count: int) -> List[Dict[str, Any]]:
+def mock_user_video_items(username: str, count: int) -> List[Dict[str, Any]]:
     handle = username.lstrip("@")
     items: List[Dict[str, Any]] = []
     for i in range(min(count, 5)):

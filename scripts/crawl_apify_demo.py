@@ -21,8 +21,8 @@ import yaml
 
 from tiktok_brand.common.io import write_jsonl
 from tiktok_brand.common.time import now_ts
-from tiktok_brand.crawl.hashtag_crawler import crawl_hashtag
-from tiktok_brand.crawl.user_crawler import crawl_user
+from tiktok_brand.crawl.video_hashtag_crawler import crawl_hashtag
+from tiktok_brand.crawl.video_user_crawler import crawl_user
 
 
 def main() -> None:
