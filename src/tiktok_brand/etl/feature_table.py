@@ -3,7 +3,7 @@ Feature table: 在 clean table 基础上派生分析/建模特征。
 
 互动指标体系（连贯）：
 - engagement_count：like + comment + share + collect（原始总量）
-- weighted_engagement_count：0.2*like + 0.3*comment + 0.5*share
+- weighted_engagement_count：0.10*like + 0.25*comment + 0.30*share + 0.35*collect
 - weighted_engagement_rate：weighted_engagement_count / view_count
 - brand_relative_engagement_index：weighted_engagement_rate / 同品牌均值
 
@@ -84,7 +84,7 @@ def add_derived_metrics(df: pd.DataFrame) -> pd.DataFrame:
     df = _ensure_numeric(
         df, ["view_count", "like_count", "comment_count", "share_count", "collect_count"]
     )
-    w_like, w_comment, w_share = get_engagement_weights()
+    w_like, w_comment, w_share, w_collect = get_engagement_weights()
 
     df["engagement_count"] = (
         df["like_count"].fillna(0)
@@ -99,6 +99,7 @@ def add_derived_metrics(df: pd.DataFrame) -> pd.DataFrame:
         w_like * df["like_count"].fillna(0)
         + w_comment * df["comment_count"].fillna(0)
         + w_share * df["share_count"].fillna(0)
+        + w_collect * df["collect_count"].fillna(0)
     )
     views = df["view_count"].replace(0, pd.NA)
     df["weighted_engagement_rate"] = df["weighted_engagement_count"] / views
@@ -160,7 +161,7 @@ def build_feature_table(df: pd.DataFrame, tz: str = "America/New_York") -> pd.Da
     df = _ensure_numeric(
         df, ["view_count", "like_count", "comment_count", "share_count", "collect_count"]
     )
-    w_like, w_comment, w_share = get_engagement_weights()
+    w_like, w_comment, w_share, w_collect = get_engagement_weights()
 
     if "engagement_count" not in df.columns:
         df["engagement_count"] = (
@@ -177,6 +178,7 @@ def build_feature_table(df: pd.DataFrame, tz: str = "America/New_York") -> pd.Da
         w_like * df["like_count"].fillna(0)
         + w_comment * df["comment_count"].fillna(0)
         + w_share * df["share_count"].fillna(0)
+        + w_collect * df["collect_count"].fillna(0)
     )
     views = df["view_count"].replace(0, pd.NA)
     df["like_to_view_rate"] = df["like_count"] / views

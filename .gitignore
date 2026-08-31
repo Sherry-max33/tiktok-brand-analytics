@@ -10,12 +10,14 @@ build/
 .ipynb_checkpoints/
 
 # Data
+data/crawl_exports/*
 data/raw/*
-data/interim/*
 data/processed/*
+!data/crawl_exports/.gitkeep
 !data/raw/.gitkeep
-!data/interim/.gitkeep
 !data/processed/.gitkeep
+!data/processed/clean/.gitkeep
+!data/processed/feature/.gitkeep
 
 # OS
 .DS_Store

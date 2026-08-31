@@ -12,8 +12,8 @@ def test_add_derived_metrics():
     out = add_derived_metrics(df)
     assert out.loc[0, "engagement_count"] == 13
     assert abs(out.loc[0, "engagement_rate"] - 0.13) < 1e-9
-    assert out.loc[0, "weighted_engagement_count"] == 0.2 * 10 + 0.3 * 2 + 0.5 * 1
-    assert abs(out.loc[0, "weighted_engagement_rate"] - 3.1 / 100) < 1e-9
+    assert out.loc[0, "weighted_engagement_count"] == 0.10 * 10 + 0.25 * 2 + 0.30 * 1 + 0.35 * 0
+    assert abs(out.loc[0, "weighted_engagement_rate"] - 1.8 / 100) < 1e-9
     assert out.loc[0, "brand_relative_engagement_index"] == 1.0
 
 

@@ -16,9 +16,15 @@ A reproducible, sample-based analytics pipeline comparing **Nike** and **Adidas*
 tiktok-brand-analytics/
 ├─ configs/                # Frozen “data contract” (accounts/hashtags/mappings/sampling)
 ├─ data/
-│  ├─ raw/                 # append-only JSONL outputs from crawlers
-│  ├─ interim/             # optional intermediate artifacts (dedup / light normalize)
-│  └─ processed/           # analysis-ready parquet tables
+│  ├─ crawl_exports/       # Bronze: crawler-native CSV (Apify export, unmapped)
+│  ├─ raw/                 # Bronze: mapped JSONL (VideoRecord / CommentRecord)
+│  └─ processed/
+│     ├─ clean/              # Silver
+│     │  ├─ tiktok_videos.parquet   # prod (build_dataset.py)
+│     │  └─ clean_test.parquet      # test (run_small_pipeline.py)
+│     └─ feature/            # Gold
+│        ├─ feature_table/          # prod partitioned (build_dataset.py)
+│        └─ feature_test.parquet    # test (run_small_pipeline.py)
 ├─ src/tiktok_brand/       # production-style python package
 ├─ scripts/                # runnable entrypoints (no notebooks required)
 ├─ notebooks/              # storytelling + visualization (thin layer)
@@ -106,13 +112,13 @@ python -m scripts.build_dataset
 ```
 
 Outputs:
-- `data/processed/tiktok_videos.parquet`
+- `data/processed/clean/tiktok_videos.parquet`
 
 ---
 
 ## Data contract (clean table schema)
 
-Minimum columns expected in `data/processed/tiktok_videos.parquet`:
+Minimum columns expected in `data/processed/clean/tiktok_videos.parquet`:
 
 - ids: `video_id`, `author_id`, `author_username`
 - source: `platform`, `source_type`, `source_query`, `seed_hashtag`

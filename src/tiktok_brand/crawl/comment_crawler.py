@@ -262,9 +262,15 @@ def crawl_comments_from_config(
     if video_ids:
         refs = [str(v).strip() for v in video_ids if str(v).strip()]
     else:
-        processed_dir = Path(project_cfg["output"]["processed_dir"])
-        feature_path = feature_table_path or processed_dir / "feature_table"
-        if not feature_path.exists() and (processed_dir / "tiktok_videos.parquet").exists():
+        output = project_cfg["output"]
+        processed_dir = Path(output["processed_dir"])
+        feature_path = feature_table_path or Path(
+            output.get("feature_dir", processed_dir / "feature")
+        ) / "feature_table"
+        clean_path = Path(output.get("clean_dir", processed_dir / "clean")) / "tiktok_videos.parquet"
+        if not feature_path.exists() and clean_path.exists():
+            feature_path = clean_path
+        elif not feature_path.exists() and (processed_dir / "tiktok_videos.parquet").exists():
             feature_path = processed_dir / "tiktok_videos.parquet"
         refs = load_top_video_ids_from_feature_table(
             feature_path,

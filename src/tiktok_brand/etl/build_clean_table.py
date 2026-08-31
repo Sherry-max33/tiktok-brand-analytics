@@ -150,7 +150,7 @@ def build_clean_table(
     df["hashtags"] = df["hashtags"].apply(_clean_hashtag_list)
     df["normalized_hashtags"] = df["hashtags"].apply(lambda tags: normalize_hashtags(tags, normalize_map))
 
-    # Brand label (simple: if any nike* tag then nike; if any adidas* tag then adidas; else null)
+    # Brand: prefer raw/CSV brand column; normalize; fill missing from hashtags only.
     def infer_brand(tags):
         tags = [t.lower() for t in (tags or [])]
         has_nike = any(t.startswith("nike") for t in tags)
@@ -163,9 +163,12 @@ def build_clean_table(
             return "both"
         return None
 
-    # Use raw brand when available, else infer from hashtags
+    # Use raw brand (CSV / crawl) when present; hashtag inference is fallback only.
     inferred = df["normalized_hashtags"].apply(infer_brand)
     if "brand" in df.columns:
+        df["brand"] = df["brand"].apply(
+            lambda x: str(x).strip().lower() if pd.notna(x) and str(x).strip() else pd.NA
+        )
         df["brand"] = df["brand"].fillna(inferred)
     else:
         df["brand"] = inferred
