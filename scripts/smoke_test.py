@@ -1,14 +1,14 @@
 """
-Smoke test: 小规模爬虫 + 全链路 ETL + 关键字段校验。
+Smoke test: small crawl + full ETL + critical field checks.
 
-用法（项目根目录）:
+Usage (repo root):
   python scripts/smoke_test.py
 
-- 先用 configs/hashtags.yaml 里当前 seed 爬一小批（per_hashtag=50）。
-  无 APIFY_API_TOKEN 时用 Apify 格式的 mock；有 token 时走真实 Apify crawl。
-- 再跑 raw → clean → feature，并检查：
-  - 必要列存在、行数>0
-  - brand / product_category / engagement_rate 等非全空、取值合理
+- Crawl a small batch from configs/hashtags.yaml (per_hashtag=50).
+  Without APIFY_API_TOKEN, uses Apify-shaped mocks; with a token, live Apify.
+- Then raw → clean → feature, and assert:
+  - required columns present, row count > 0
+  - brand / product_categories / engagement_rate look valid
 """
 from pathlib import Path
 import os
@@ -33,9 +33,9 @@ REQUIRED_FEATURE_COLS = [
     "caption_text",
     "hashtags",
     "normalized_hashtags",
-    "product_line",
-    "product_category",
-    "brand_style",
+    "brand_styles",
+    "product_lines",
+    "product_categories",
     "content_type",
     "engagement_rate",
     "view_count",
@@ -43,7 +43,7 @@ REQUIRED_FEATURE_COLS = [
     "crawled_at",
 ]
 VALID_BRANDS = {"nike", "adidas", "both"}
-VALID_PRODUCT_CATEGORIES = {"shoes", "apparel", "uncategorized"}
+VALID_PRODUCT_CATEGORIES = {"shoes", "apparel", "accessories", "uncategorized"}
 
 
 def _rate_non_null(s: pd.Series) -> float:
@@ -59,11 +59,17 @@ def _rate_non_empty_str(s: pd.Series) -> float:
     return float((s2 != "").mean()) if len(s) else 0.0
 
 
+def _rate_non_empty_list(s: pd.Series) -> float:
+    if s is None or len(s) == 0:
+        return 0.0
+    return float(s.apply(lambda x: isinstance(x, list) and len(x) > 0).mean())
+
+
 def _get_mode() -> str:
     """
     SMOKE_MODE:
-      - mock (default): 宽松，保证管道可跑通即可
-      - real: 严格，加入命中率/分布校验，适用于接上真实 API 后
+      - mock (default): lenient — pipeline must run end-to-end
+      - real: strict hit-rate / distribution checks after live API crawls
     """
     return (os.environ.get("SMOKE_MODE") or "mock").strip().lower()
 
@@ -80,9 +86,9 @@ def run_etl_and_return_feature_df():
         raise FileNotFoundError(f"No tiktok_hashtag_*.jsonl under {raw_dir}. Run crawl first.")
     clean_df = build_clean_table(
         raw_paths=raw_paths,
-        hashtags_cfg_path=str(ROOT / "configs/hashtags.yaml"),
         accounts_cfg_path=str(ROOT / "configs/accounts.yaml"),
         project_cfg_path=str(ROOT / "configs/project.yaml"),
+        hashtags_cfg_path=str(ROOT / "configs/hashtags.yaml"),
     )
     feature_df = build_feature_table(clean_df)
     return feature_df, clean_df, len(raw_paths)
@@ -103,11 +109,16 @@ def validate_feature_df(df: pd.DataFrame) -> list[str]:
         if invalid_brand.any():
             bad = df.loc[invalid_brand, "brand"].dropna().unique().tolist()
             errors.append(f"Unexpected brand values: {bad}")
-    if "product_category" in df.columns:
-        cats = df["product_category"].dropna().astype(str).str.lower().unique()
-        bad = [c for c in cats if c not in VALID_PRODUCT_CATEGORIES]
+    if "product_categories" in df.columns:
+        flat = []
+        for val in df["product_categories"].dropna():
+            if isinstance(val, list):
+                flat.extend(str(c).lower() for c in val)
+            else:
+                flat.append(str(val).lower())
+        bad = [c for c in set(flat) if c not in VALID_PRODUCT_CATEGORIES]
         if bad:
-            errors.append(f"Unexpected product_category values: {bad}")
+            errors.append(f"Unexpected product_categories values: {bad}")
     if "engagement_rate" in df.columns:
         rate = pd.to_numeric(df["engagement_rate"], errors="coerce")
         out_of_range = (rate.dropna() < 0) | (rate.dropna() > 1)
@@ -119,35 +130,38 @@ def validate_feature_df(df: pd.DataFrame) -> list[str]:
             errors.append("view_count has negative values.")
 
     # --- Business-ish sanity checks ---
-    # mock 模式不强制命中率（mock caption/hashtags 很单一，避免误判失败）
+    # mock mode skips hit-rates (mock captions/hashtags are too uniform)
     if mode == "real":
-        # brand 分布：至少出现 nike 和 adidas（你当前 smoke seed 是 2+2）
+        # brand distribution: expect both nike and adidas
         if "brand" in df.columns:
             brands = set(df["brand"].dropna().astype(str).str.lower().unique().tolist())
             if not {"nike", "adidas"}.issubset(brands):
                 errors.append(f"Expected both nike and adidas in brand, got: {sorted(brands)}")
 
-        # product_line 命中率（非空）
-        if "product_line" in df.columns:
-            hit = _rate_non_empty_str(df["product_line"])
+        # product_lines hit-rate (non-empty list)
+        if "product_lines" in df.columns:
+            hit = _rate_non_empty_list(df["product_lines"])
             if hit < 0.10:
-                errors.append(f"product_line hit-rate too low: {hit:.1%} (<10%)")
+                errors.append(f"product_lines hit-rate too low: {hit:.1%} (<10%)")
 
-        # product_category 非 uncategorized 比例
-        if "product_category" in df.columns:
-            pc = df["product_category"].astype(str).str.lower()
-            known = pc.isin({"shoes", "apparel"})
-            known_rate = float(known.mean())
+        # share of product_categories that are not only uncategorized
+        if "product_categories" in df.columns:
+            def _known(cats):
+                if not isinstance(cats, list) or not cats:
+                    return False
+                return any(c != "uncategorized" for c in cats)
+
+            known_rate = float(df["product_categories"].apply(_known).mean())
             if known_rate < 0.20:
-                errors.append(f"product_category known-rate too low: {known_rate:.1%} (<20%)")
+                errors.append(f"product_categories known-rate too low: {known_rate:.1%} (<20%)")
 
-        # content_type 命中率
+        # content_type hit-rate
         if "content_type" in df.columns:
             hit = _rate_non_empty_str(df["content_type"])
             if hit < 0.10:
                 errors.append(f"content_type hit-rate too low: {hit:.1%} (<10%)")
 
-        # engagement_rate 非空比例（只在 view_count>0 的行上评估）
+        # engagement_rate non-null rate (rows with view_count > 0 only)
         if "engagement_rate" in df.columns and "view_count" in df.columns:
             views = pd.to_numeric(df["view_count"], errors="coerce").fillna(0)
             mask = views > 0
@@ -174,7 +188,7 @@ def main() -> None:
             print(f"  - {e}")
         sys.exit(1)
     print("SMOKE TEST PASSED")
-    print("  Required columns present, brand/product_category/engagement_rate look valid.")
+    print("  Required columns present; brand / product_categories / engagement_rate look valid.")
 
 
 if __name__ == "__main__":

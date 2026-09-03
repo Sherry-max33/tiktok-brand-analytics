@@ -1,5 +1,26 @@
-# Feature engineering rules — keywords & thresholds only.
-# Regex / matching logic lives in src/tiktok_brand/etl/*.py
+# =============================================================================
+# feature_rules.yaml — Feature engineering rules (keywords & thresholds)
+# =============================================================================
+# Matching / regex logic lives in src/tiktok_brand/etl/*.py
+# CTA regex patterns are in src/tiktok_brand/etl/cta_rules.py (not here).
+# Product/style taxonomy maps are in configs/taxonomy.yaml (not here).
+#
+# Index (top-level keys)
+# ----------------------
+# engagement_weights      Weighted engagement: like/comment/share/collect →
+#                         weighted_engagement_count / rate / brand_relative_index
+# content_type_rules      Caption → content_type (P0–P6 classification_priority:
+#                         social_viral → … → community_collab). strong / weak /
+#                         require_pairs / bts_context
+# creator_type_keywords   author_signature → creator_type
+#                         (sports / lifestyle / fashion / beauty)
+# creator_tier_thresholds author_follower_count → creator_tier
+#                         (nano / micro / mid / macro / mega)
+# trending_audio          Sample-relative is_sample_trending_audio via music_id
+#                         frequency (top_percentile + min_video_count)
+# appearance_type         CV frame-ratio thresholds for appearance_type
+#                         (person_present / product_only / mixed / other / unknown)
+# =============================================================================
 
 engagement_weights:
   like: 0.10

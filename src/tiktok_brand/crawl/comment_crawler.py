@@ -223,9 +223,11 @@ def load_top_video_ids_from_feature_table(
 
     sort_col = {
         "engagement": "engagement_count",
-        "views": "view_count",
+        "like_count": "like_count",
         "likes": "like_count",
-    }.get(sort_by, "engagement_count")
+        "views": "view_count",
+        "view_count": "view_count",
+    }.get(sort_by, "like_count")
 
     if sort_col not in df.columns:
         sort_col = "view_count" if "view_count" in df.columns else "video_id"
@@ -242,6 +244,16 @@ def crawl_comments_from_config(
     feature_table_path: Optional[Path] = None,
     limit: Optional[int] = None,
 ) -> None:
+    """
+    Comment crawl driven by configs/project.yaml sampling params:
+
+      sort_by → rank videos
+      candidate_videos_for_comments → candidate pool size (target + buffer)
+      target_videos_for_comments → stop after this many successful videos
+      comments_per_video → max comments per successful video
+
+    Failures / empty results are skipped; next candidate fills the slot.
+    """
     import yaml
     from tiktok_brand.common.io import write_jsonl
 
@@ -254,13 +266,15 @@ def crawl_comments_from_config(
     raw_dir.mkdir(parents=True, exist_ok=True)
 
     comments_per_video = int(sampling.get("comments_per_video", 100))
-    target_videos = int(limit or sampling.get("target_videos_for_comments", 1000))
-    sort_by = str(sampling.get("sort_by", "engagement"))
+    target_videos = int(limit or sampling.get("target_videos_for_comments", 105))
+    candidate_n = int(sampling.get("candidate_videos_for_comments", target_videos))
+    if candidate_n < target_videos:
+        candidate_n = target_videos
+    sort_by = str(sampling.get("sort_by", "like_count"))
     actor_id = apify_cfg.get("comment_actor_id")
 
-    refs: List[str]
     if video_ids:
-        refs = [str(v).strip() for v in video_ids if str(v).strip()]
+        candidates = [str(v).strip() for v in video_ids if str(v).strip()][:candidate_n]
     else:
         output = project_cfg["output"]
         processed_dir = Path(output["processed_dir"])
@@ -272,26 +286,62 @@ def crawl_comments_from_config(
             feature_path = clean_path
         elif not feature_path.exists() and (processed_dir / "tiktok_videos.parquet").exists():
             feature_path = processed_dir / "tiktok_videos.parquet"
-        refs = load_top_video_ids_from_feature_table(
+        candidates = load_top_video_ids_from_feature_table(
             feature_path,
-            limit=target_videos,
+            limit=candidate_n,
             sort_by=sort_by,
         )
 
-    if not refs:
+    if not candidates:
         log.warning("No video IDs found for comment crawl")
         return
 
-    records = crawl_comments(
-        refs,
-        comments_per_video=comments_per_video,
-        tz_name=tz,
-        actor_id=actor_id,
+    log.info(
+        "Comment crawl: %s candidates (sort_by=%s), stop at %s successful videos, %s comments/video",
+        len(candidates),
+        sort_by,
+        target_videos,
+        comments_per_video,
     )
-    if not records:
+
+    all_records: List[Dict[str, Any]] = []
+    successful_videos = 0
+    attempted = 0
+
+    for video_ref in candidates:
+        if successful_videos >= target_videos:
+            break
+        attempted += 1
+        rows = crawl_video_comments(
+            video_ref,
+            comments_per_video,
+            tz,
+            actor_id=actor_id,
+        )
+        if not rows:
+            log.warning("Skip video '%s' (no comments / crawl failed); try next candidate", video_ref)
+            continue
+        all_records.extend(rows)
+        successful_videos += 1
+        log.info(
+            "Progress: %s/%s successful videos (%s attempted of %s candidates)",
+            successful_videos,
+            target_videos,
+            attempted,
+            len(candidates),
+        )
+
+    if not all_records:
         log.warning("Comment crawl returned no records")
         return
 
-    out_path = raw_dir / f"tiktok_top{len(refs)}_comments_{now_ts()}.jsonl"
-    write_jsonl(out_path, records)
-    log.info("Wrote %s comment records to %s", len(records), out_path)
+    out_path = raw_dir / f"tiktok_top{successful_videos}_comments_{now_ts()}.jsonl"
+    write_jsonl(out_path, all_records)
+    log.info(
+        "Wrote %s comment records from %s successful videos (attempted %s / %s candidates) to %s",
+        len(all_records),
+        successful_videos,
+        attempted,
+        len(candidates),
+        out_path,
+    )

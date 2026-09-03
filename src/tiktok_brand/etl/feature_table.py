@@ -1,26 +1,20 @@
 """
-Feature table: 在 clean table 基础上派生分析/建模特征。
+Feature table: analysis/modeling features derived from the clean table.
 
-互动指标体系（连贯）：
-- engagement_count：like + comment + share + collect（原始总量）
-- weighted_engagement_count：0.10*like + 0.25*comment + 0.30*share + 0.35*collect
-- weighted_engagement_rate：weighted_engagement_count / view_count
-- brand_relative_engagement_index：weighted_engagement_rate / 同品牌均值
+Engagement metrics:
+- engagement_count: like + comment + share + collect
+- weighted_engagement_count: 0.10*like + 0.25*comment + 0.30*share + 0.35*collect
+- weighted_engagement_rate: weighted_engagement_count / view_count
+- brand_relative_engagement_index: weighted_engagement_rate / brand mean
 
-CTA（configs/feature_rules.yaml）：
+Taxonomy (configs/taxonomy.yaml) — feature-layer multi-label; compute order:
+- brand_styles → product_lines → product_categories (cascade; see yaml)
+
+CTA:
 - has_purchase_cta / has_engagement_cta / has_discovery_traffic_cta / has_promo_language
-- has_cta = purchase OR engagement OR discovery（promo 单独保留）
+- has_cta = purchase OR engagement OR discovery (promo kept separate)
 
-内容分类（classification_priority P0–P6，非内容价值排序）：
-- content_type 规则见 configs/feature_rules.yaml
-
-文本 / 嵌入预备：
-- caption_clean, embedding_text（caption + [HASHTAGS] + hashtags）
-- text_embedding / visual_embedding：占位，由 embeddings/ 模块填充
-
-视觉：
-- appearance_type：CV 流水线填充（person_present / product_only / mixed / other / unknown）
-- page_url：@username/video/{video_id}
+content_type: classification_priority P0–P6 in configs/feature_rules.yaml
 """
 
 from __future__ import annotations
@@ -35,6 +29,11 @@ from ..embeddings.visual_embed import compute_visual_embedding_id
 from .content_type_rules import infer_content_type
 from .cta_rules import detect_cta_flags
 from .rule_config import get_engagement_weights, load_feature_rules
+from .taxonomy_rules import (
+    infer_brand_styles,
+    infer_product_categories,
+    infer_product_lines,
+)
 from .text_prep import build_embedding_text, clean_caption
 
 _CREATOR_TYPE_KEYWORDS = {
@@ -127,8 +126,13 @@ def _mark_sample_trending_audio(df: pd.DataFrame) -> pd.Series:
     return df["music_id"].fillna("").astype(str).isin(trending_ids)
 
 
-def build_feature_table(df: pd.DataFrame, tz: str = "America/New_York") -> pd.DataFrame:
+def build_feature_table(
+    df: pd.DataFrame,
+    tz: str = "America/New_York",
+    taxonomy_cfg_path: str = "configs/taxonomy.yaml",
+) -> pd.DataFrame:
     df = df.copy()
+    tax_path = str(taxonomy_cfg_path)
 
     if "video_id" not in df.columns:
         df["video_id"] = df.get("id", pd.Series(dtype=object))
@@ -161,33 +165,13 @@ def build_feature_table(df: pd.DataFrame, tz: str = "America/New_York") -> pd.Da
     df = _ensure_numeric(
         df, ["view_count", "like_count", "comment_count", "share_count", "collect_count"]
     )
-    w_like, w_comment, w_share, w_collect = get_engagement_weights()
-
-    if "engagement_count" not in df.columns:
-        df["engagement_count"] = (
-            df["like_count"].fillna(0)
-            + df["comment_count"].fillna(0)
-            + df["share_count"].fillna(0)
-            + df["collect_count"].fillna(0)
-        )
-    if "engagement_rate" not in df.columns:
-        df["engagement_rate"] = df["engagement_count"] / df["view_count"].replace(0, pd.NA)
-        df.loc[df["view_count"].fillna(0) <= 0, "engagement_rate"] = pd.NA
-
-    df["weighted_engagement_count"] = (
-        w_like * df["like_count"].fillna(0)
-        + w_comment * df["comment_count"].fillna(0)
-        + w_share * df["share_count"].fillna(0)
-        + w_collect * df["collect_count"].fillna(0)
-    )
+    # Always (re)compute engagement features in feature layer
+    df = add_derived_metrics(df)
     views = df["view_count"].replace(0, pd.NA)
     df["like_to_view_rate"] = df["like_count"] / views
     df["comment_to_view_rate"] = df["comment_count"] / views
     df["share_to_view_rate"] = df["share_count"] / views
     df["engagement_to_view_rate"] = df["engagement_count"] / views
-    df["weighted_engagement_rate"] = df["weighted_engagement_count"] / views
-    brand_mean = df.groupby("brand", dropna=False)["weighted_engagement_rate"].transform("mean")
-    df["brand_relative_engagement_index"] = df["weighted_engagement_rate"] / brand_mean.replace(0, pd.NA)
     likes = df["like_count"].replace(0, pd.NA)
     df["comment_to_like_ratio"] = df["comment_count"] / likes
 
@@ -232,8 +216,24 @@ def build_feature_table(df: pd.DataFrame, tz: str = "America/New_York") -> pd.Da
     df["is_sample_trending_audio"] = _mark_sample_trending_audio(df)
     df["content_type"] = caption.apply(infer_content_type)
     df["appearance_type"] = None
-    if "product_category" not in df.columns:
-        df["product_category"] = None
+
+    # Taxonomy: brand_styles → product_lines → product_categories (cascade in yaml)
+    tags_series = df.get("normalized_hashtags", hashtags)
+    df["brand_styles"] = tags_series.apply(lambda tags: infer_brand_styles(tags, tax_path))
+    df["product_lines"] = tags_series.apply(lambda tags: infer_product_lines(tags, tax_path))
+    df["product_categories"] = [
+        infer_product_categories(
+            product_lines=lines if isinstance(lines, list) else [],
+            tags=tags if isinstance(tags, list) else [],
+            caption=cap,
+            path=tax_path,
+        )
+        for lines, tags, cap in zip(
+            df["product_lines"].tolist(),
+            tags_series.tolist(),
+            caption.tolist(),
+        )
+    ]
 
     df["crawl_at"] = pd.to_datetime(df.get("crawled_at", pd.NaT), errors="coerce")
     df["crawl_batch_id"] = df.get("crawled_at_ts", pd.NA).astype(str)

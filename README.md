@@ -1,12 +1,15 @@
 # TikTok Brand Analytics: Nike vs Adidas
 
 A reproducible, sample-based analytics pipeline comparing **Nike** and **Adidas** TikTok content across:
-1) **Awareness / Engagement**
-2) **Social Commerce Signals**
-3) **Influencer Strategy (Official vs UGC)**
-4) **Sentiment & Topics (NLP)**
 
-> **Scope note (important):** Hashtag collection is **sample-based** (TikTok hashtag feeds are ranked streams, not a complete historical archive). Each crawl run records `crawled_at` to make analyses reproducible.
+1. Awareness / engagement  
+2. Social commerce signals  
+3. Influencer strategy (official vs UGC)  
+4. Sentiment & topics (NLP)
+
+> **Scope:** Hashtag collection is **sample-based** (ranked feeds, not a full archive). Each crawl records `crawled_at` for reproducibility.
+
+Full documentation: **[docs/README.md](docs/README.md)**.
 
 ---
 
@@ -14,131 +17,95 @@ A reproducible, sample-based analytics pipeline comparing **Nike** and **Adidas*
 
 ```
 tiktok-brand-analytics/
-├─ configs/                # Frozen “data contract” (accounts/hashtags/mappings/sampling)
+├─ configs/                 # Crawl seeds + ETL rules
+│  ├─ hashtags.yaml         # seed tags + normalize_tags (clean)
+│  ├─ accounts.yaml         # official accounts
+│  ├─ project.yaml          # sampling / paths / Apify
+│  ├─ taxonomy.yaml         # style / line / category (feature)
+│  └─ feature_rules.yaml    # engagement / content_type / tiers
 ├─ data/
-│  ├─ crawl_exports/       # Bronze: crawler-native CSV (Apify export, unmapped)
-│  ├─ raw/                 # Bronze: mapped JSONL (VideoRecord / CommentRecord)
+│  ├─ crawl_exports/        # Bronze: crawler-native CSV (optional)
+│  ├─ raw/                  # Bronze: VideoRecord / CommentRecord JSONL
 │  └─ processed/
-│     ├─ clean/              # Silver
-│     │  ├─ tiktok_videos.parquet   # prod (build_dataset.py)
-│     │  └─ clean_test.parquet      # test (run_small_pipeline.py)
-│     └─ feature/            # Gold
-│        ├─ feature_table/          # prod partitioned (build_dataset.py)
-│        └─ feature_test.parquet    # test (run_small_pipeline.py)
-├─ src/tiktok_brand/       # production-style python package
-├─ scripts/                # runnable entrypoints (no notebooks required)
-├─ notebooks/              # storytelling + visualization (thin layer)
-└─ tests/                  # schema + transforms unit tests
+│     ├─ clean/             # Silver fact parquet
+│     └─ feature/           # Gold feature table / test parquet
+├─ docs/                    # Architecture, schemas, runbook
+├─ src/tiktok_brand/        # Python package
+├─ scripts/                 # Crawl + ETL entrypoints
+├─ notebooks/               # Analysis / storytelling
+└─ tests/
 ```
 
 ---
 
-## Part 1 — Data collection (frozen v1)
+## Data layers (summary)
 
-### A) Official accounts (user crawl)
+| Layer | Responsibility |
+|-------|----------------|
+| **Raw** | Mapped crawl JSONL (`VideoRecord`) |
+| **Clean** | Caption/hashtag cleanup, `normalized_hashtags`, `brand`, `is_official_brand`, dedupe — **no** taxonomy, **no** engagement rates |
+| **Feature** | Engagement metrics, CTA flags, `content_type`, creator tier/type, taxonomy multi-labels |
 
-We only treat the two main accounts as “official brand accounts” in Phase 1:
+Official accounts (Phase 1): `@nike`, `@jumpman23`, `@adidas` → `is_official_brand`. Verification ≠ official.
 
-- Nike: `@nike`
-- Adidas: `@adidas`
+Stats field for bookmarks/favorites: **`collect_count`** (legacy `save_count` accepted in clean).
 
-We also store the platform verification flag (`author_verified`) when available, but **verification ≠ official**.
-
-Official label (Phase 1):
-- `is_official_brand = author_username in {nike, adidas}`
-
-### B) Hashtag crawl (seed hashtags)
-
-We crawl a **seed list** of hashtags for each brand (see `configs/hashtags.yaml`).  
-Each record keeps:
-- `source_type`: `"user"` or `"hashtag"`
-- `source_query`: username or seed hashtag
-- `seed_hashtag`: (hashtag crawl only)
-
-### C) Stats fields (MVP)
-
-We store core engagement stats:
-- `view_count`, `like_count`, `comment_count`, `share_count`
-- `save_count` (bookmark/favorite) **if present**; otherwise null.
-
-### D) Time fields
-
-We persist:
-- `create_time_ts` (int, seconds)
-- `crawled_at` (ISO-8601 with timezone, e.g. `2026-01-06T22:30:12-05:00`)
-- `crawled_at_ts` (int, seconds)
-
-### E) Normalization & semantic fields
-
-In the cleaned dataset we add:
-- `normalized_hashtags` (list) — e.g. `adidassambas → adidassamba`
-- `brand_style`: `originals` or null (from `adidasoriginals`)
-- `product_line`: one of `{samba, gazelle, spezial, tech, null}`
-
-**Rationale:** `product_line` is a *content-semantic line* (minimal explainable unit).  
-`niketech` behaves like a concrete collection line on TikTok (Tech Fleece), while `nikeair` is a broad family/tech prefix and is kept as a seed hashtag but **not** mapped to `product_line`.
+Taxonomy (feature): **`brand_styles` → `product_lines` → `product_categories`** (cascaded). Details: [docs/04-taxonomy.md](docs/04-taxonomy.md).
 
 ---
 
-## Quickstart (local)
+## Quickstart
 
 ### 1) Setup
-Using `uv` (recommended):
 
 ```bash
 uv sync
+# or: pip install -e .
 ```
 
-Or with pip:
+### 2) Crawl
+
+Requires `APIFY_API_TOKEN` for live Apify runs (see `.env.example`):
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .
-```
-
-### 2) Run crawlers (placeholders)
-The crawler scripts are scaffolded. Add credentials / session configuration as needed:
-
-```bash
-python -m scripts.crawl_users
 python -m scripts.crawl_hashtags
+python -m scripts.crawl_users
+python -m scripts.crawl_comments   # optional
 ```
 
-### 3) Build clean dataset
+### 3) Build clean + feature
 
 ```bash
 python -m scripts.build_dataset
 ```
 
 Outputs:
+
 - `data/processed/clean/tiktok_videos.parquet`
+- `data/processed/feature/feature_table/`
+
+Smoke / small run: `python scripts/smoke_test.py` or `python -m scripts.run_small_pipeline`.
 
 ---
 
-## Data contract (clean table schema)
+## Schema pointers
 
-Minimum columns expected in `data/processed/clean/tiktok_videos.parquet`:
-
-- ids: `video_id`, `author_id`, `author_username`
-- source: `platform`, `source_type`, `source_query`, `seed_hashtag`
-- time: `create_time_ts`, `create_time`, `crawled_at`, `crawled_at_ts`
-- text: `caption_raw`, `hashtags`, `normalized_hashtags`
-- stats: `view_count`, `like_count`, `comment_count`, `share_count`, `save_count`
-- labels: `is_official_brand`, `author_verified`, `brand`, `brand_style`, `product_line`
-- derived: `engagement_count`, `engagement_rate`
+- Clean & feature contracts: [docs/03-data-dictionary.md](docs/03-data-dictionary.md)
+- Crawl fields & seeds: [docs/02-crawl.md](docs/02-crawl.md)
 
 ---
 
 ## Ethics & limitations
 
 - Respect TikTok Terms of Service and local laws.
-- This repo is designed for **public data** and **sample-based** analyses.
+- Designed for **public**, **sample-based** analysis.
 - Hashtag feeds are algorithmically ranked; results depend on crawl time and location.
 
 ---
 
-## Next milestones
-- Part 2: feature table + caption embeddings
-- Retrieval demo: content-based similarity (caption + visual)
-- BA add-ons: quasi-experimental “A/B-like” template effect analysis
+## Roadmap
+
+- Comment clean/feature ETL and deeper NLP
+- Sentence-BERT / CLIP embeddings (beyond placeholders)
+- Retrieval demo (caption + visual similarity)
+- Quasi-experimental “A/B-like” template effect analysis

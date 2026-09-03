@@ -21,15 +21,19 @@ def main() -> None:
     raw_paths = sorted(glob.glob(str(raw_dir / "*.jsonl")))
     clean_df = build_clean_table(
         raw_paths=raw_paths,
-        hashtags_cfg_path="configs/hashtags.yaml",
-        accounts_cfg_path="configs/accounts.yaml",
+        accounts_cfg_path=output.get("accounts_cfg", "configs/accounts.yaml"),
         project_cfg_path="configs/project.yaml",
+        hashtags_cfg_path=output.get("hashtags_cfg", "configs/hashtags.yaml"),
     )
     clean_out = clean_dir / "tiktok_videos.parquet"
     clean_df.to_parquet(clean_out, index=False)
     print(f"Wrote {len(clean_df):,} rows to {clean_out}")
 
-    feature_df = build_feature_table(clean_df, tz=tz)
+    feature_df = build_feature_table(
+        clean_df,
+        tz=tz,
+        taxonomy_cfg_path=output.get("taxonomy_cfg", "configs/taxonomy.yaml"),
+    )
     out_partitioned = feature_dir / "feature_table"
     write_partitioned_parquet(feature_df, out_partitioned, partition_cols=["brand", "post_date"])
     print(f"Wrote feature table ({len(feature_df):,} rows) to {out_partitioned}/")

@@ -33,9 +33,9 @@ def run_etl() -> None:
 
     clean_df = build_clean_table(
         raw_paths=raw_paths,
-        hashtags_cfg_path=str(ROOT / "configs/hashtags.yaml"),
         accounts_cfg_path=str(ROOT / "configs/accounts.yaml"),
         project_cfg_path=str(ROOT / "configs/project.yaml"),
+        hashtags_cfg_path=str(ROOT / "configs/hashtags.yaml"),
     )
     clean_dir.mkdir(parents=True, exist_ok=True)
     clean_out = clean_dir / "clean_test.parquet"
@@ -47,7 +47,7 @@ def run_etl() -> None:
     feature_df.to_parquet(feature_test_path, index=False)
     print(f"Wrote feature table to {feature_test_path} (rows={len(feature_df)})")
 
-    cols = ["brand", "product_category", "content_type", "weighted_engagement_rate"]
+    cols = ["brand", "product_categories", "content_type", "weighted_engagement_rate"]
     existing = [c for c in cols if c in feature_df.columns]
     print(feature_df[existing].head())
 

@@ -25,6 +25,7 @@ def test_build_feature_table():
                 "create_time_ts": 1700000000,
                 "caption_raw": "Check this out #nike #fashion shop now",
                 "hashtags": ["nike", "fashion"],
+                "normalized_hashtags": ["nike", "niketech"],
                 "view_count": 1000,
                 "like_count": 100,
                 "comment_count": 20,
@@ -57,6 +58,48 @@ def test_build_feature_table():
     assert out.loc[0, "creator_tier"] == "micro"
     assert out.loc[0, "has_purchase_cta"] == True
     assert out.loc[0, "has_cta"] == True
+    assert out.loc[0, "brand_styles"] == ["technical"]
+    assert out.loc[0, "product_lines"] == ["tech_fleece"]
+    assert out.loc[0, "product_categories"] == ["apparel"]
+
+
+def test_taxonomy_multi_label():
+    from tiktok_brand.etl.taxonomy_rules import (
+        infer_brand_styles,
+        infer_product_categories,
+        infer_product_lines,
+    )
+
+    tags = ["adidasoriginals", "adidassamba", "adidasstyle"]
+    assert infer_brand_styles(tags) == ["lifestyle", "retro"]
+    assert infer_product_lines(tags) == ["originals_apparel", "samba"]
+    # (1) lines present → only line_to_category (not tag apparel from adidasstyle)
+    assert infer_product_categories(
+        product_lines=["originals_apparel", "samba"],
+        tags=tags,
+        caption="",
+    ) == ["shoes", "apparel"]
+
+    # (2) no lines → hashtag category map
+    assert infer_product_categories(
+        product_lines=[],
+        tags=["nikeshoes", "nikeoutfit"],
+        caption="",
+    ) == ["shoes", "apparel"]
+
+    # (3) caption heuristic
+    assert infer_product_categories(
+        product_lines=[],
+        tags=["nike"],
+        caption="love this sneaker pair",
+    ) == ["shoes"]
+
+    # (4) uncategorized
+    assert infer_product_categories(product_lines=[], tags=["nike"], caption="") == [
+        "uncategorized"
+    ]
+    assert infer_brand_styles(["nike"]) == []
+
 
 
 def test_detect_cta_flags_promo_not_cta():

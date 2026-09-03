@@ -1,31 +1,51 @@
+# =============================================================================
+# project.yaml — Crawl + output paths (pipeline parameters)
+# =============================================================================
+# Index
+# -----
+# sampling     videos_per_hashtag / videos_per_account / comment selection
+# api_limits   quota hints
+# apify        actor IDs
+# output       crawl_exports / raw / processed paths
+# time         timezone
+#
+# Related configs
+# ---------------
+# hashtags.yaml      crawl seed tags + normalize_tags (clean)
+# accounts.yaml      crawl seed accounts
+# taxonomy.yaml      brand_styles / product_lines / product_categories (feature)
+# feature_rules.yaml engagement / content_type / CTA thresholds
+# =============================================================================
+
 sampling:
-  # 时间维度与截图一致
   time_range_months: 6
-  window_days: 30                # Research API 视频查询强制要求 ≤30 天窗口切分
+  window_days: 30
 
-  # 1. 广度探索：整体抓取目标
-  total_videos_target: 6000      # 视频总量 6k
-  keywords_target: 30            # 24–30 个 hashtag + user (Nike+Adidas)
-  videos_per_keyword_target: 200  # 计算逻辑：6000 / 30
+  # --- Hashtag video crawl ---
+  # For each tag in configs/hashtags.yaml, fetch this many videos.
+  videos_per_hashtag: 100
 
-  # 2. 深度挖掘：评论采样方案 (方案 A)
-  # 截图建议选 1200 个候选，以最终保证拿到 1000 个合格视频的评论
-  target_videos_for_comments: 1000
-  candidate_videos_for_comments: 1200 # 截图推荐：多选 200 个做备份
+  # --- Official account video crawl ---
+  # For each username in configs/accounts.yaml, fetch this many videos.
+  videos_per_account: 500
 
-  # 每个 hashtag 下的筛选逻辑
-  videos_per_hashtag_top_n: 40   # 对应截图：每个 hashtag 选 Top 35–40 个视频
-  sort_by: engagement            # 对应截图：按 likes/views/engagement 排序（默认 engagement）
-
-  # 评论抓取限制
-  comments_per_video: 100        # 对应截图：每个视频 max_count = 100
-  total_comments_target: 100000  # 对应截图：目标 10 万条评论
-  max_comments_per_request: 100  # Research API 评论单次查询上限
+  # --- Comment crawl ---
+  # Algorithm:
+  #   1. Rank all videos by sort_by (desc)
+  #   2. Take the first candidate_videos_for_comments as the candidate pool
+  #      (candidate = target + buffer for failures)
+  #   3. Crawl comments in rank order; on failure/empty, skip to next candidate
+  #   4. Stop when successful videos == target_videos_for_comments
+  #      or the candidate pool is exhausted
+  sort_by: like_count
+  target_videos_for_comments: 105
+  candidate_videos_for_comments: 120
+  comments_per_video: 100
+  max_comments_per_request: 100
 
 api_limits:
-  # 截图底部的 API 配额限制
   requests_per_day: 1000
-  daily_reset_utc_hour: 0        # 每天 0 点 UTC 重置
+  daily_reset_utc_hour: 0
 
 apify:
   actor_id: clockworks/tiktok-scraper
@@ -38,6 +58,10 @@ output:
   processed_dir: data/processed
   clean_dir: data/processed/clean
   feature_dir: data/processed/feature
+  taxonomy_cfg: configs/taxonomy.yaml
+  hashtags_cfg: configs/hashtags.yaml
+  accounts_cfg: configs/accounts.yaml
+  feature_rules_cfg: configs/feature_rules.yaml
 
 time:
   timezone: America/New_York

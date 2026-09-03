@@ -1,3 +1,12 @@
+# =============================================================================
+# hashtags.yaml — Crawl seed hashtags + alias normalization (clean)
+# =============================================================================
+# Used by:
+#   crawler          → nike / adidas seed lists
+#   build_clean_table → normalize_tags → normalized_hashtags
+# Product/style maps → configs/taxonomy.yaml (feature ETL)
+# =============================================================================
+
 nike:
   - nike
   - nikeshoes
@@ -41,100 +50,8 @@ adidas:
   - adidasforum
   - tracksuit
 
+# Plural / variant aliases → canonical tag (clean layer)
 normalize_tags:
   adidassambas: adidassamba
   adidasgazelles: adidasgazelle
   adidasspezials: adidasspezial
-
-product_line_map:
-  # --- Nike Lines ---
-  niketech: tech_fleece     # 服装线 (Apparel)
-  jordan: jordan            # 核心系列 (Series)
-  airmax: air_max           # 经典科技 (Tech/Shoes)
-  nikedunk: dunk            # 潮流爆款 (Trend/Shoes)
-  airforce1: af1            # 基础长青 (Classic/Shoes)
-  
-  # --- Adidas Lines ---
-  adidassamba: samba        # 潮流复古 (Trend/Shoes)
-  adidasgazelle: gazelle    # 潮流复古 (Trend/Shoes)
-  adidasspezial: spezial    # 潮流复古 (Trend/Shoes)
-  ultraboost: ultraboost    # 核心性能 (Performance/Shoes)
-  adidasforum: forum        # 经典篮球 (Classic/Shoes)
-  # 建议新增 Adidas 服装线
-  adidasoriginals: originals_apparel # 与 niketech 对标
-  tracksuit: tracksuit      # 标志性单品
-
-brand_style_map:
-  # Nike 风格归类
-  nikerunning: performance
-  niketraining: performance
-  nikebasketball: performance
-  nikeoutfit: lifestyle
-  nikestyle: lifestyle
-  niketech: technical
-  # Adidas 风格归类
-  adidasfootball: performance
-  adidasrunning: performance
-  adidastraining: performance
-  adidasoriginals: lifestyle
-  adidasstyle: lifestyle
-  adidassamba: retro
-  adidasgazelle: retro
-
-# 产品类目：标签 → shoes/apparel
-product_category_map:
-  # --- Shoes (鞋类) ---
-  nikeshoes: shoes
-  nikesneakers: shoes
-  jordan: shoes
-  airmax: shoes
-  af1: shoes
-  airforce1: shoes
-  nikedunk: shoes
-  adidasshoes: shoes
-  adidassamba: shoes
-  adidasgazelle: shoes
-  adidasspezial: shoes
-  adidasforum: shoes
-  ultraboost: shoes
-  # --- Apparel (服装) ---
-  niketech: apparel
-  nikeoutfit: apparel
-  nikefit: apparel
-  nikelook: apparel
-  adidasoutfit: apparel
-  adidaslook: apparel
-  adidasstyle: apparel
-  tracksuit: apparel
-
-# 逻辑兜底：若 product_line 已确定，据此推断 product_category
-line_to_category_map:
-  tech_fleece: apparel
-  samba: shoes
-  gazelle: shoes
-  spezial: shoes
-  jordan: shoes
-  air_max: shoes
-  dunk: shoes
-  af1: shoes
-  ultraboost: shoes
-  forum: shoes
-  originals_apparel: apparel
-  tracksuit: apparel
-
-accessories_keywords:
-  - bag
-  - backpack
-  - socks
-  - sock
-  - hat
-  - cap
-  - beanie
-  - watch
-  - glasses
-  - accessory
-  - accessories
-  - duffel
-  - belt
-  - glove
-  - gloves

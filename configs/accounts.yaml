@@ -1,3 +1,9 @@
+# =============================================================================
+# accounts.yaml — Official brand accounts (crawl seeds)
+# =============================================================================
+# Used by: scripts/crawl_users.py, build_clean_table (is_official_brand)
+# =============================================================================
+
 official_accounts:
   nike: ["nike", "jumpman23"]
   adidas: ["adidas"]

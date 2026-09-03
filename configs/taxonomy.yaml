@@ -1,0 +1,129 @@
+# =============================================================================
+# taxonomy.yaml — Tag / caption → multi-label product & style (feature ETL)
+# =============================================================================
+# Used by: build_feature_table
+# Field compute order: brand_styles → product_lines → product_categories
+# Crawl seeds + normalize_tags: configs/hashtags.yaml
+#
+# Matching
+# --------
+# brand_styles / product_lines:
+#   Scan ALL normalized hashtags; collect every hit; dedupe; fixed sort.
+#   Empty list [] = unrecognized.
+#
+# product_categories (cascaded — first non-empty layer wins):
+#   (1) If product_lines non-empty → map each via line_to_category_map
+#       e.g. tech_fleece → apparel, samba → shoes
+#   (2) Else scan hashtags → product_category_map (+ accessories_keywords on tags)
+#       e.g. nikeshoes → shoes, nikeoutfit → apparel
+#   (3) Else caption heuristics (category_caption_keywords + accessories_keywords)
+#       apparel: fit/wear/outfit/… ; shoes: shoe/sneaker/… ; accessories: bag/socks/…
+#   (4) Else → ["uncategorized"]
+#
+# Index (top-level keys, same order as feature compute)
+# ----------------------------------------------------
+# brand_style_map            tag → brand_style
+# product_line_map           tag → product_line
+# product_category_map       tag → shoes / apparel / accessories
+# line_to_category_map       product_line → product_category
+# category_caption_keywords  caption heuristics (layer ③)
+# accessories_keywords       caption/tag → accessories
+# =============================================================================
+
+brand_style_map:
+  nikerunning: performance
+  niketraining: performance
+  nikebasketball: performance
+  nikeoutfit: lifestyle
+  nikestyle: lifestyle
+  niketech: technical
+  adidasfootball: performance
+  adidasrunning: performance
+  adidastraining: performance
+  adidasoriginals: lifestyle
+  adidasstyle: lifestyle
+  adidassamba: retro
+  adidasgazelle: retro
+
+product_line_map:
+  niketech: tech_fleece
+  jordan: jordan
+  airmax: air_max
+  nikedunk: dunk
+  airforce1: af1
+  adidassamba: samba
+  adidasgazelle: gazelle
+  adidasspezial: spezial
+  ultraboost: ultraboost
+  adidasforum: forum
+  adidasoriginals: originals_apparel
+  tracksuit: tracksuit
+
+product_category_map:
+  nikeshoes: shoes
+  nikesneakers: shoes
+  jordan: shoes
+  airmax: shoes
+  af1: shoes
+  airforce1: shoes
+  nikedunk: shoes
+  adidasshoes: shoes
+  adidassamba: shoes
+  adidasgazelle: shoes
+  adidasspezial: shoes
+  adidasforum: shoes
+  ultraboost: shoes
+  niketech: apparel
+  nikeoutfit: apparel
+  nikefit: apparel
+  nikelook: apparel
+  adidasoutfit: apparel
+  adidaslook: apparel
+  adidasstyle: apparel
+  tracksuit: apparel
+
+line_to_category_map:
+  tech_fleece: apparel
+  samba: shoes
+  gazelle: shoes
+  spezial: shoes
+  jordan: shoes
+  air_max: shoes
+  dunk: shoes
+  af1: shoes
+  ultraboost: shoes
+  forum: shoes
+  originals_apparel: apparel
+  tracksuit: apparel
+
+category_caption_keywords:
+  apparel:
+    - fit
+    - wear
+    - outfit
+    - jacket
+    - shirt
+    - pants
+    - look
+  shoes:
+    - shoe
+    - sneaker
+    - kicks
+    - pair
+
+accessories_keywords:
+  - bag
+  - backpack
+  - socks
+  - sock
+  - hat
+  - cap
+  - beanie
+  - watch
+  - glasses
+  - accessory
+  - accessories
+  - duffel
+  - belt
+  - glove
+  - gloves
