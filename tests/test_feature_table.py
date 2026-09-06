@@ -43,7 +43,10 @@ def test_build_feature_table():
             }
         ]
     )
-    out = build_feature_table(clean)
+    out = build_feature_table(
+        clean,
+        encode_batch_fn=lambda texts: [[0.1, 0.2, 0.3] for _ in texts],
+    )
     assert "video_url" in out.columns
     assert out.loc[0, "page_url"] == "https://www.tiktok.com/@nike/video/v1"
     assert "weighted_engagement_count" in out.columns
@@ -61,6 +64,19 @@ def test_build_feature_table():
     assert out.loc[0, "brand_styles"] == ["technical"]
     assert out.loc[0, "product_lines"] == ["tech_fleece"]
     assert out.loc[0, "product_categories"] == ["apparel"]
+    assert "sentiment_score" in out.columns
+    assert "caption_lang" in out.columns
+    assert "sentiment_method" in out.columns
+    assert out.loc[0, "sentiment_method"] in {
+        "vader_en",
+        "not_scored",
+        "not_scored_non_en",
+        "vader_via_mt",
+    }
+    assert out.loc[0, "embedding_method"] == "sbert_multilingual"
+    assert out.loc[0, "text_embedding"] == [0.1, 0.2, 0.3]
+    assert out.loc[0, "visual_embedding_method"] == "not_embedded"
+    assert out.loc[0, "appearance_type"] == "unknown"
 
 
 def test_taxonomy_multi_label():

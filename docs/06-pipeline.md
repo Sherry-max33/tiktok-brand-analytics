@@ -24,7 +24,11 @@ python -m scripts.build_dataset
 Outputs:
 
 - `data/processed/clean/tiktok_videos.parquet`
-- `data/processed/feature/feature_table/` (partitioned)
+- `data/processed/feature/feature_table/` (partitioned by `brand`) + `feature_table.parquet`
+- `data/processed/clean/tiktok_comments.parquet`
+- `data/processed/feature/comment_feature_table.parquet`
+
+Bulk note: `BUILD_MT=0` (default) skips non-EN machine translation for speed/rate limits. `BUILD_MT=1` enables `vader_via_mt`.
 
 ## Small / test pipeline
 

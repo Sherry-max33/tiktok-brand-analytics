@@ -15,6 +15,10 @@ CTA:
 - has_cta = purchase OR engagement OR discovery (promo kept separate)
 
 content_type: classification_priority P0–P6 in configs/feature_rules.yaml
+
+Sentiment:
+- detect caption_lang + confidence; high-conf English → vader_en
+- other languages → MT to English then vader_via_mt (configurable; keep methods separate)
 """
 
 from __future__ import annotations
@@ -24,11 +28,12 @@ from typing import List, Optional
 
 import pandas as pd
 
-from ..embeddings.caption_embed import compute_sentiment_score
-from ..embeddings.visual_embed import compute_visual_embedding_id
+from ..embeddings.caption_embed import compute_text_embeddings
+from ..embeddings.visual_embed import compute_visual_features
 from .content_type_rules import infer_content_type
 from .cta_rules import detect_cta_flags
 from .rule_config import get_engagement_weights, load_feature_rules
+from .sentiment_rules import score_caption_sentiment
 from .taxonomy_rules import (
     infer_brand_styles,
     infer_product_categories,
@@ -130,6 +135,8 @@ def build_feature_table(
     df: pd.DataFrame,
     tz: str = "America/New_York",
     taxonomy_cfg_path: str = "configs/taxonomy.yaml",
+    feature_rules_path: str = "configs/feature_rules.yaml",
+    encode_batch_fn=None,
 ) -> pd.DataFrame:
     df = df.copy()
     tax_path = str(taxonomy_cfg_path)
@@ -215,7 +222,6 @@ def build_feature_table(
         df["has_music"] = False
     df["is_sample_trending_audio"] = _mark_sample_trending_audio(df)
     df["content_type"] = caption.apply(infer_content_type)
-    df["appearance_type"] = None
 
     # Taxonomy: brand_styles → product_lines → product_categories (cascade in yaml)
     tags_series = df.get("normalized_hashtags", hashtags)
@@ -239,11 +245,73 @@ def build_feature_table(
     df["crawl_batch_id"] = df.get("crawled_at_ts", pd.NA).astype(str)
     df["raw_payload_path"] = ""
 
-    df["sentiment_score"] = caption.apply(compute_sentiment_score)
-    df["text_embedding"] = ""
-    df["visual_embedding"] = df["video_id"].apply(
-        lambda vid: compute_visual_embedding_id(str(vid) if pd.notna(vid) else "", None)
+    sentiment_rows = [
+        score_caption_sentiment(
+            cap,
+            tags if isinstance(tags, list) else [],
+            rules_path=feature_rules_path,
+        )
+        for cap, tags in zip(caption.tolist(), hashtags.tolist())
+    ]
+    sent_df = pd.DataFrame(sentiment_rows, index=df.index)
+    for col in [
+        "caption_original",
+        "caption_lang",
+        "caption_lang_confidence",
+        "has_mixed_language",
+        "is_emoji_only",
+        "caption_en",
+        "translation_status",
+        "sentiment_score",
+        "sentiment_method",
+    ]:
+        df[col] = sent_df[col]
+
+    emb_rows = compute_text_embeddings(
+        df["embedding_text"].tolist(),
+        rules_path=feature_rules_path,
+        encode_batch_fn=encode_batch_fn,
     )
+    emb_df = pd.DataFrame(emb_rows, index=df.index)
+    df["text_embedding"] = emb_df["text_embedding"]
+    df["embedding_method"] = emb_df["embedding_method"]
+    df["embedding_model"] = emb_df["embedding_model"]
+
+    # Shared frame resolve: URL → download → 20/40/60/80% frames → CLIP + appearance
+    cover_urls = df["cover_url"].tolist() if "cover_url" in df.columns else [None] * len(df)
+    cover_paths = df["cover_path"].tolist() if "cover_path" in df.columns else [None] * len(df)
+    video_paths = df["video_path"].tolist() if "video_path" in df.columns else [None] * len(df)
+    video_urls = df["video_url"].tolist() if "video_url" in df.columns else [None] * len(df)
+    page_urls = df["page_url"].tolist() if "page_url" in df.columns else [None] * len(df)
+    author_usernames = (
+        df["author_username"].tolist() if "author_username" in df.columns else [None] * len(df)
+    )
+    person_ratios = (
+        df["person_ratio"].tolist() if "person_ratio" in df.columns else None
+    )
+    product_ratios = (
+        df["product_ratio"].tolist() if "product_ratio" in df.columns else None
+    )
+    vis_rows = compute_visual_features(
+        df["video_id"].tolist() if "video_id" in df.columns else [None] * len(df),
+        video_urls=video_urls,
+        page_urls=page_urls,
+        author_usernames=author_usernames,
+        cover_urls=cover_urls,
+        cover_paths=cover_paths,
+        video_paths=video_paths,
+        person_ratios=person_ratios,
+        product_ratios=product_ratios,
+        rules_path=feature_rules_path,
+    )
+    vis_df = pd.DataFrame(vis_rows, index=df.index)
+    df["visual_embedding"] = vis_df["visual_embedding"]
+    df["visual_embedding_method"] = vis_df["visual_embedding_method"]
+    df["visual_embedding_model"] = vis_df["visual_embedding_model"]
+    df["appearance_type"] = vis_df["appearance_type"]
+    # Optional debug/lineage: where frames were cached (list[str])
+    df["frame_paths"] = vis_df["frame_paths"]
+
     if "content_cluster_id" not in df.columns:
         df["content_cluster_id"] = pd.NA
 

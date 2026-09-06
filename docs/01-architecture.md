@@ -73,7 +73,9 @@ Hashtag seeds + official accounts
 - `content_type` (P0–P6 keyword rules)
 - Creator type & tier
 - Taxonomy: `brand_styles` → `product_lines` → `product_categories` (cascaded)
-- Placeholders: `sentiment_score`, `text_embedding`, `visual_embedding`, `appearance_type`, `content_cluster_id`
+- Placeholders: `visual_embedding`, `appearance_type`, `content_cluster_id`
+- Sentiment: language detect + VADER (`vader_en`); non-EN optional MT → `vader_via_mt`
+- Text embeddings: multilingual Sentence-BERT on `embedding_text` (no MT)
 
 ## Config ownership
 

@@ -18,8 +18,12 @@
 #                         (nano / micro / mid / macro / mega)
 # trending_audio          Sample-relative is_sample_trending_audio via music_id
 #                         frequency (top_percentile + min_video_count)
-# appearance_type         CV frame-ratio thresholds for appearance_type
-#                         (person_present / product_only / mixed / other / unknown)
+# sentiment               Language detect + VADER; non-EN optional MT → vader_via_mt
+#                         (en_confidence_threshold, mt_enabled, mt_min_chars)
+# text_embedding          Multilingual Sentence-BERT on embedding_text (no MT)
+#                         (enabled, model_name, min_chars, batch_size)
+# visual_embedding        CLIP on cover_url/cover_path (enabled, model_name, batch_size)
+# appearance_type         CV frame-ratio thresholds when detector ratios exist
 # =============================================================================
 
 engagement_weights:
@@ -291,8 +295,35 @@ trending_audio:
   top_percentile: 0.9
   min_video_count: 3
 
+# Sentiment: language detect + VADER; non-EN optionally via MT → vader_via_mt
+sentiment:
+  en_confidence_threshold: 0.80   # caption_lang==en and conf >= this → vader_en
+  mt_enabled: true                # false → non-EN stays not_scored_non_en / pending
+  mt_min_chars: 8                 # skip MT if cleaned text shorter than this
+  # Provider: deep-translator GoogleTranslator (network). Inject translate_fn in tests.
+
+# Text embeddings: multilingual Sentence-BERT (no MT; encode original embedding_text)
+text_embedding:
+  enabled: true
+  model_name: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+  min_chars: 3
+  batch_size: 32
+
+# Visual embeddings: assemble TikTok URL → download MP4 → 4 frames @ 20/40/60/80%
+visual_embedding:
+  enabled: true
+  model_name: sentence-transformers/clip-ViT-B-32
+  batch_size: 16
+  max_frames: 4
+  frame_fractions: [0.2, 0.4, 0.6, 0.8]
+  frames_dir: data/processed/frames
+  download_video: false          # true or VISUAL_DOWNLOAD=1 → yt-dlp download then extract
+  download_max_height: 480       # cap resolution (480p enough for frames/CLIP; avoid HD)
+  # Optional: chrome|safari|firefox — or env YTDLP_COOKIES_FROM_BROWSER / enrich --cookies-from-browser
+  cookies_from_browser: null
+
 appearance_type:
-  # CV pipeline placeholder; frame ratios applied in embeddings/visual_embed.py later
+  # Used when person/product frame ratios are supplied by a future CV step
   person_ratio: 0.6
   product_only_ratio: 0.6
   mixed_min_ratio: 0.2

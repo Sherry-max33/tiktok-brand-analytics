@@ -18,6 +18,9 @@ data/processed/*
 !data/processed/.gitkeep
 !data/processed/clean/.gitkeep
 !data/processed/feature/.gitkeep
+!data/processed/frames/
+data/processed/frames/**
+!data/processed/frames/README.md
 
 # OS
 .DS_Store

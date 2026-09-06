@@ -105,7 +105,6 @@ Smoke / small run: `python scripts/smoke_test.py` or `python -m scripts.run_smal
 
 ## Roadmap
 
-- Comment clean/feature ETL and deeper NLP
-- Sentence-BERT / CLIP embeddings (beyond placeholders)
-- Retrieval demo (caption + visual similarity)
+- Visual embeddings / `appearance_type` (CV)
+- `content_cluster_id` from text embeddings
 - Quasi-experimental “A/B-like” template effect analysis

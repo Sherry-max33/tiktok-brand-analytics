@@ -11,7 +11,15 @@ dependencies = [
   "pyarrow>=14.0",
   "tqdm>=4.66",
   "tenacity>=8.0",
-  "apify-client>=1.6.0",
+  "vaderSentiment>=3.3.2",
+  "langdetect>=1.0.9",
+  "deep-translator>=1.11.4",
+  "sentence-transformers>=3.0.0",
+  "Pillow>=10.0.0",
+  "yt-dlp>=2024.8.0",
+  "curl_cffi>=0.5.10",
+  "opencv-python-headless>=4.8.0",
+  "apify-client>=1.7.0",
 ]
 
 [project.optional-dependencies]
