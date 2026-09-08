@@ -1,6 +1,6 @@
 import pandas as pd
 from tiktok_brand.etl.cta_rules import detect_cta_flags
-from tiktok_brand.etl.content_type_rules import infer_content_type
+from tiktok_brand.etl.content_type_rules import infer_content_types
 from tiktok_brand.etl.feature_table import add_derived_metrics, build_feature_table
 from tiktok_brand.etl.text_prep import build_embedding_text, clean_caption
 
@@ -76,18 +76,22 @@ def test_build_feature_table():
     assert out.loc[0, "embedding_method"] == "sbert_multilingual"
     assert out.loc[0, "text_embedding"] == [0.1, 0.2, 0.3]
     assert out.loc[0, "visual_embedding_method"] == "not_embedded"
-    assert out.loc[0, "appearance_type"] == "unknown"
+    assert out.loc[0, "visual_format"] == "unknown"
+    assert out.loc[0, "visual_classification_status"] == "unknown"
+    assert "appearance_type" not in out.columns
 
 
 def test_taxonomy_multi_label():
     from tiktok_brand.etl.taxonomy_rules import (
+        brand_styles_to_flags,
         infer_brand_styles,
         infer_product_categories,
         infer_product_lines,
     )
 
     tags = ["adidasoriginals", "adidassamba", "adidasstyle"]
-    assert infer_brand_styles(tags) == ["lifestyle", "retro"]
+    # Seed-hashtag priors only (samba is a product line, not a style)
+    assert infer_brand_styles(tags) == ["lifestyle"]
     assert infer_product_lines(tags) == ["originals_apparel", "samba"]
     # (1) lines present → only line_to_category (not tag apparel from adidasstyle)
     assert infer_product_categories(
@@ -116,6 +120,64 @@ def test_taxonomy_multi_label():
     ]
     assert infer_brand_styles(["nike"]) == []
 
+    # Seed-hashtag prior ∪ keyword evidence (multi-label); no SKU→style
+    assert infer_brand_styles(
+        ["nikerunning"], caption="new foam cushioning technology"
+    ) == ["performance", "technical"]
+    assert infer_brand_styles(
+        ["adidassamba"], caption="retro samba with streetwear ootd fit check"
+    ) == ["lifestyle", "retro"]
+    assert infer_brand_styles(["adidassamba"], caption="just posted") == []
+    flags = brand_styles_to_flags(["performance", "technical"])
+    assert flags == {
+        "brand_style_performance": True,
+        "brand_style_technical": True,
+        "brand_style_lifestyle": False,
+        "brand_style_retro": False,
+    }
+    # Alias / new line tags from unmapped-hashtag audit
+    assert infer_product_lines(["jordanbrand", "sambas", "dunks", "nikeairmax"]) == [
+        "air_max",
+        "dunk",
+        "jordan",
+        "samba",
+    ]
+    assert infer_product_lines(["f50", "predator", "adidassuperstar", "adizero"]) == [
+        "adizero",
+        "f50",
+        "predator",
+        "superstar",
+    ]
+    assert infer_product_categories(
+        product_lines=["f50", "superstar"], tags=[], caption=""
+    ) == ["shoes"]
+    # Generic footwear tags (no product_line) → category map layer
+    assert infer_product_categories(
+        product_lines=[],
+        tags=["sneakers", "sneakerhead", "cleats"],
+        caption="",
+    ) == ["shoes"]
+
+    # Weak fashion alone ≠ apparel; pair with product term / shoes tag
+    assert infer_product_categories(
+        product_lines=[], tags=["ootd", "fashion", "streetwear"], caption=""
+    ) == ["uncategorized"]
+    assert infer_product_categories(
+        product_lines=[], tags=["ootd", "jacket"], caption=""
+    ) == ["apparel"]
+    assert infer_product_categories(
+        product_lines=[], tags=["ootd", "sneakers"], caption=""
+    ) == ["shoes"]
+    assert infer_product_categories(
+        product_lines=[], tags=["nikeoutfit"], caption=""
+    ) == ["apparel"]
+    # Bare caption "outfit" / "fit" no longer forces apparel
+    assert infer_product_categories(
+        product_lines=[], tags=["nike"], caption="today's outfit look"
+    ) == ["uncategorized"]
+    assert infer_product_categories(
+        product_lines=[], tags=["nike"], caption="love this jacket"
+    ) == ["apparel"]
 
 
 def test_detect_cta_flags_promo_not_cta():
@@ -124,9 +186,49 @@ def test_detect_cta_flags_promo_not_cta():
     assert flags["has_cta"] is False
 
 
-def test_infer_content_type_priority():
-    assert infer_content_type("join the challenge #viral") == "social_viral"
-    assert infer_content_type("how to style these samba") == "tutorial_utility"
+def test_infer_content_types_multilabel():
+    assert infer_content_types("how to style these samba") == ["tutorial_utility"]
+    assert infer_content_types("honest review of these runners first impression") == [
+        "product_review"
+    ]
+    assert infer_content_types("shopping haul unboxing what i bought") == [
+        "product_showcase"
+    ]
+    assert infer_content_types("shop now back in stock link in bio") == ["product_promo"]
+    assert infer_content_types("ootd fit check outfit inspo") == ["vibe_ootd"]
+    assert infer_content_types("teamed up with adidas in collaboration with") == [
+        "collaboration"
+    ]
+    assert infer_content_types("giving back charity fundraiser community event") == [
+        "community_impact"
+    ]
+    # bare BTS alone should not force story_heritage
+    assert infer_content_types("bts on set today") == []
+    assert infer_content_types("bts workshop craftsmanship how it's made") == [
+        "story_heritage"
+    ]
+    # viral/challenge alone is no longer a type
+    assert infer_content_types("join the challenge #viral") == []
+    # multi-label: review + ootd can co-occur
+    both = infer_content_types(
+        "honest review first impression and ootd fit check outfit inspo"
+    )
+    assert "product_review" in both
+    assert "vibe_ootd" in both
+    assert both.index("product_review") < both.index("vibe_ootd")
+    # hashtag-compact forms from audit
+    assert "collaboration" in infer_content_types("essentials #createdwithadidas @adidas")
+    assert "product_review" in infer_content_types("hyperboost #runningshoereviews")
+    assert "product_showcase" in infer_content_types("gazelles #thrifthaul #shoppingvlog")
+    # LLM round: conversion / experience / collab-x / non-how-to tutorial
+    assert infer_content_types("on sale now available grab yours") == ["product_promo"]
+    assert "product_review" in infer_content_types("fit true to size and worth it")
+    assert "collaboration" in infer_content_types("adidas x diesel capsule drop")
+    assert "collaboration" not in infer_content_types("shoutout @jamesharden only")
+    assert "collaboration" not in infer_content_types("box is 10 x 10 cm")
+    assert "tutorial_utility" in infer_content_types("master the fundamentals watch & learn")
+    assert "story_heritage" in infer_content_types("pays homage to sneaker history")
+    assert "official_campaign" in infer_content_types("nike presents the new chapter")
 
 
 def test_build_embedding_text_dedupes_hashtags_in_caption():

@@ -1,14 +1,12 @@
-"""Enrich video feature table: download MP4 → extract frames → CLIP + appearance.
+"""Enrich video feature table: download MP4 → extract frames → CLIP + zero-shot axes.
 
-Resumable: skips rows that already have visual_embedding_method == clip_mean,
+Resumable: skips rows that already have visual_embedding_method == clip_visual,
 and reuses cached frames under data/processed/frames/{video_id}/.
 
 Usage (repo root):
-  # Use already-downloaded frames (no yt-dlp / Apify):
   PYTHONPATH=src python -m scripts.enrich_visual --from-cache
+  PYTHONPATH=src python -m scripts.enrich_visual --from-cache --classify-only
   PYTHONPATH=src VISUAL_DOWNLOAD=1 python -m scripts.enrich_visual --limit 5
-  PYTHONPATH=src VISUAL_DOWNLOAD=1 python -m scripts.enrich_visual --cookies-from-browser chrome
-  PYTHONPATH=src VISUAL_DOWNLOAD=1 python -m scripts.enrich_visual --frames-only
 """
 
 from __future__ import annotations
@@ -22,17 +20,17 @@ import pandas as pd
 import yaml
 
 from tiktok_brand.embeddings.frames import list_cached_frames, resolve_video_frames
+from tiktok_brand.embeddings.visual_classify import classification_column_names
 from tiktok_brand.embeddings.visual_embed import (
     METHOD_CLIP,
     compute_visual_features,
 )
 from tiktok_brand.etl.feature_table import write_partitioned_parquet
 
-VIS_COLS = [
+BASE_VIS_COLS = [
     "visual_embedding",
     "visual_embedding_method",
     "visual_embedding_model",
-    "appearance_type",
     "frame_paths",
     "clip_alignment_mean",
     "clip_alignment_max",
@@ -40,6 +38,10 @@ VIS_COLS = [
     "clip_alignment_std",
     "clip_text_embedding",
 ]
+
+
+def _vis_cols(rules_path: str) -> list[str]:
+    return BASE_VIS_COLS + classification_column_names(rules_path)
 
 
 def _has_clip_embedding(row: pd.Series) -> bool:
@@ -63,33 +65,32 @@ def _has_clip_embedding(row: pd.Series) -> bool:
     return False
 
 
-def _needs_visual(row: pd.Series) -> bool:
+def _needs_visual(row: pd.Series, *, classify_only: bool) -> bool:
+    if classify_only:
+        status = row.get("visual_classification_status")
+        if status is None or (isinstance(status, float) and pd.isna(status)):
+            return True
+        return str(status) == "unknown"
     return not _has_clip_embedding(row)
 
 
-def _has_local_frames(video_id: str, frames_root: Path, n_needed: int = 4) -> bool:
+def _has_local_frames(video_id: str, frames_root: Path, n_needed: int = 1) -> bool:
     paths = list_cached_frames(str(video_id), frames_root)
     return len(paths) >= n_needed
 
 
-
-def _ensure_cols(df: pd.DataFrame) -> pd.DataFrame:
+def _ensure_cols(df: pd.DataFrame, rules_path: str) -> pd.DataFrame:
     out = df.copy()
-    for col in VIS_COLS:
+    for col in _vis_cols(rules_path):
         if col not in out.columns:
             if col == "frame_paths":
                 out[col] = [[] for _ in range(len(out))]
-            elif col == "appearance_type":
-                out[col] = None
-            elif col.startswith("clip_alignment_"):
-                out[col] = None
             else:
                 out[col] = None
     return out
 
 
 def _normalize_for_parquet(df: pd.DataFrame) -> pd.DataFrame:
-    """Avoid Arrow mix of '' / None / list in embedding columns."""
     out = df.copy()
 
     def _emb(x):
@@ -125,53 +126,44 @@ def _normalize_for_parquet(df: pd.DataFrame) -> pd.DataFrame:
 
 def _save(df: pd.DataFrame, video_path: Path, feature_dir: Path) -> None:
     clean = _normalize_for_parquet(df)
+    if "appearance_type" in clean.columns:
+        clean = clean.drop(columns=["appearance_type"])
     clean.to_parquet(video_path, index=False)
     write_partitioned_parquet(clean, feature_dir / "feature_table", partition_cols=["brand"])
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Download videos, extract frames, CLIP embed")
-    parser.add_argument("--limit", type=int, default=None, help="Max videos to process")
-    parser.add_argument("--batch-size", type=int, default=25, help="Rows per CLIP/write batch")
-    parser.add_argument("--sleep", type=float, default=0.5, help="Seconds between downloads")
+    parser = argparse.ArgumentParser(
+        description="Download videos, extract frames, CLIP embed + zero-shot classify"
+    )
+    parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--batch-size", type=int, default=25)
+    parser.add_argument("--sleep", type=float, default=0.5)
+    parser.add_argument("--frames-only", action="store_true")
+    parser.add_argument("--from-cache", action="store_true")
     parser.add_argument(
-        "--frames-only",
+        "--classify-only",
         action="store_true",
-        help="Only download + extract frames (no CLIP write to parquet)",
+        help="Recompute visual_format/setting from cached frames (skip download)",
     )
-    parser.add_argument(
-        "--from-cache",
-        action="store_true",
-        help="Only use existing local frames under frames_dir (no video download)",
-    )
-    parser.add_argument(
-        "--checkpoint-every",
-        type=int,
-        default=50,
-        help="Write parquet every N processed videos (with CLIP)",
-    )
-    parser.add_argument(
-        "--cookies-from-browser",
-        default=None,
-        help="yt-dlp browser for cookies (chrome|safari|firefox). "
-        "Also: env YTDLP_COOKIES_FROM_BROWSER or feature_rules visual_embedding.cookies_from_browser",
-    )
+    parser.add_argument("--checkpoint-every", type=int, default=50)
+    parser.add_argument("--cookies-from-browser", default=None)
     args = parser.parse_args()
 
-    from_cache = bool(args.from_cache)
+    from_cache = bool(args.from_cache) or bool(args.classify_only)
     if from_cache:
         os.environ["VISUAL_DOWNLOAD"] = "0"
     else:
-        # Force download for this run unless already set
         os.environ.setdefault("VISUAL_DOWNLOAD", "1")
 
     project_cfg = yaml.safe_load(Path("configs/project.yaml").read_text(encoding="utf-8"))
     feature_dir = Path(project_cfg["output"].get("feature_dir", "data/processed/feature"))
     rules_path = project_cfg["output"].get("feature_rules_cfg", "configs/feature_rules.yaml")
     video_path = feature_dir / "feature_table.parquet"
+    vis_cols = _vis_cols(rules_path)
 
     print(f"Videos: {video_path}", flush=True)
-    df = _ensure_cols(pd.read_parquet(video_path))
+    df = _ensure_cols(pd.read_parquet(video_path), rules_path)
 
     vis_cfg = yaml.safe_load(Path(rules_path).read_text(encoding="utf-8")).get(
         "visual_embedding", {}
@@ -179,25 +171,26 @@ def main() -> None:
     frames_root = Path(vis_cfg.get("frames_dir", "data/processed/frames"))
     fractions = tuple(vis_cfg.get("frame_fractions") or [0.2, 0.4, 0.6, 0.8])
     max_height = int(vis_cfg.get("download_max_height", 480))
-    n_frames = len(fractions)
 
-    idxs = [i for i in df.index if _needs_visual(df.loc[i])]
+    idxs = [
+        i
+        for i in df.index
+        if _needs_visual(df.loc[i], classify_only=bool(args.classify_only))
+    ]
     if from_cache:
         before = len(idxs)
         idxs = [
             i
             for i in idxs
-            if _has_local_frames(str(df.at[i, "video_id"]), frames_root, n_frames)
+            if _has_local_frames(str(df.at[i, "video_id"]), frames_root, 1)
         ]
-        print(
-            f"From-cache filter: {len(idxs)}/{before} have ≥{n_frames} local frames",
-            flush=True,
-        )
+        print(f"From-cache filter: {len(idxs)}/{before} have local frames", flush=True)
     if args.limit is not None:
         idxs = idxs[: int(args.limit)]
 
     print(
-        f"Candidates needing visual: {len(idxs)} (of {len(df)}; from_cache={from_cache})",
+        f"Candidates: {len(idxs)} (of {len(df)}; from_cache={from_cache}; "
+        f"classify_only={bool(args.classify_only)})",
         flush=True,
     )
     if not idxs:
@@ -228,8 +221,9 @@ def main() -> None:
             vid = str(row.get("video_id") or "")
             n = start + i
             try:
-                if from_cache:
-                    paths = [str(p) for p in list_cached_frames(vid, frames_root)]
+                cached = [str(p) for p in list_cached_frames(vid, frames_root)]
+                if from_cache or cached:
+                    paths = cached
                 else:
                     paths = resolve_video_frames(
                         vid,
@@ -270,13 +264,10 @@ def main() -> None:
             processed += len(batch_idxs)
             continue
 
-        # CLIP + appearance (+ alignment via caption_en) for this batch
-        captions = []
-        for idx in batch_idxs:
-            if "caption_en" in df.columns:
-                captions.append(df.at[idx, "caption_en"])
-            else:
-                captions.append(None)
+        captions = [
+            df.at[idx, "caption_en"] if "caption_en" in df.columns else None
+            for idx in batch_idxs
+        ]
         rows = compute_visual_features(
             [str(df.at[idx, "video_id"]) for idx in batch_idxs],
             frame_paths_per_video=frame_paths_batch,
@@ -284,8 +275,9 @@ def main() -> None:
             rules_path=rules_path,
         )
         for idx, result in zip(batch_idxs, rows):
-            for col in VIS_COLS:
-                df.at[idx, col] = result.get(col)
+            for col in vis_cols:
+                if col in result:
+                    df.at[idx, col] = result.get(col)
             if result.get("visual_embedding_method") == METHOD_CLIP:
                 stats["clip_ok"] += 1
             else:
@@ -297,7 +289,6 @@ def main() -> None:
             _save(df, video_path, feature_dir)
 
     if args.frames_only:
-        # still persist frame_paths if column present
         _save(df, video_path, feature_dir)
 
     print(f"Done: {stats}", flush=True)

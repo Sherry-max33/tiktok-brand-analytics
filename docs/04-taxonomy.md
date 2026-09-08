@@ -12,17 +12,37 @@ brand_styles → product_lines → product_categories
 
 YAML top-level keys follow the same order for readability.
 
-## Multi-label rules (`brand_styles`, `product_lines`)
+## Brand styles (multi-label positioning)
+
+`brand_styles` answers **what brand positioning the video conveys**, not which SKU it shows.
+
+| Source | YAML | Role |
+|--------|------|------|
+| Crawl seed hashtag prior | `seed_style_map` | e.g. `#nikerunning` → `performance` |
+| Caption + hashtag evidence | `style_keywords` | e.g. foam/technology → `technical` |
+
+Final label = **union** of both (deduped, fixed order). Empty `[]` = unrecognized.
+
+Examples:
+
+- Running-tech talk → `[performance, technical]`
+- Samba street fit with retro + ootd cues → `[lifestyle, retro]`
+- Bare `#adidassamba` with no style cues → `[]` (product line ≠ style)
+
+`seed_style_map` keys are **crawl seed hashtags** from `configs/hashtags.yaml`, not TikTok `@username` accounts.
+
+Do **not** map product names (samba/gazelle) directly to style.
+
+For modeling, expand with `brand_styles_to_flags` → `brand_style_performance`, …
+
+## Multi-label rules (`product_lines`)
 
 1. Scan **all** `normalized_hashtags`.
 2. Collect every map hit; dedupe; sort with a fixed label order.
 3. Empty list `[]` means unrecognized (not null).
 
-Maps:
-
 | YAML key | Output field | Example |
 |----------|--------------|---------|
-| `brand_style_map` | `brand_styles` | `nikerunning` → `performance` |
 | `product_line_map` | `product_lines` | `niketech` → `tech_fleece` |
 
 ## Category cascade (`product_categories`)
@@ -31,20 +51,12 @@ First non-empty layer wins (layers are **not** merged):
 
 | Step | Condition | Action |
 |------|-----------|--------|
-| (1) | `product_lines` non-empty | Map each line via `line_to_category_map` (e.g. `tech_fleece` → `apparel`, `samba` → `shoes`) |
-| (2) | else | Scan hashtags via `product_category_map` (+ accessories keywords on tags) |
-| (3) | else | Caption heuristics (`category_caption_keywords` + `accessories_keywords`) |
+| (1) | `product_lines` non-empty | Map each line via `line_to_category_map` |
+| (2) | else | Strong category map + apparel product terms; weak fashion tags (`ootd`/…) alone do not assign apparel |
+| (3) | else | Caption heuristics (strong apparel product terms; weak fashion needs strong evidence) |
 | (4) | else | `["uncategorized"]` |
 
-When (1) fires, tag-level category hits are **ignored** so style tags (e.g. `adidasstyle` → apparel) cannot override line-derived categories.
-
-### Caption heuristics (step 3)
-
-| Category | Example keywords |
-|----------|------------------|
-| apparel | fit, wear, outfit, jacket, shirt, pants, look |
-| shoes | shoe, sneaker, kicks, pair |
-| accessories | bag, socks, hat, … (`accessories_keywords`) |
+When (1) fires, tag-level category hits are **ignored** so style tags cannot override line-derived categories.
 
 ### Allowed category labels
 

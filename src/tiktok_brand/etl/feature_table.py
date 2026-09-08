@@ -14,7 +14,9 @@ CTA:
 - has_purchase_cta / has_engagement_cta / has_discovery_traffic_cta / has_promo_language
 - has_cta = purchase OR engagement OR discovery (promo kept separate)
 
-content_type: classification_priority P0–P6 in configs/feature_rules.yaml
+content_type: multi-label list from configs/feature_rules.yaml
+  (all matching categories; order is stable, not exclusive)
+social_mechanic: multi-label TikTok propagation/format cues (parallel axis)
 
 Sentiment:
 - detect caption_lang + confidence; high-conf English → vader_en
@@ -30,7 +32,8 @@ import pandas as pd
 
 from ..embeddings.caption_embed import compute_text_embeddings
 from ..embeddings.visual_embed import compute_visual_features
-from .content_type_rules import infer_content_type
+from .content_type_rules import infer_content_types
+from .social_mechanic_rules import infer_social_mechanics
 from .cta_rules import detect_cta_flags
 from .rule_config import get_engagement_weights, load_feature_rules
 from .sentiment_rules import score_caption_sentiment
@@ -221,11 +224,19 @@ def build_feature_table(
     if "has_music" not in df.columns:
         df["has_music"] = False
     df["is_sample_trending_audio"] = _mark_sample_trending_audio(df)
-    df["content_type"] = caption.apply(infer_content_type)
+    df["content_type"] = caption.apply(infer_content_types)
+    df["social_mechanic"] = caption.apply(infer_social_mechanics)
 
     # Taxonomy: brand_styles → product_lines → product_categories (cascade in yaml)
     tags_series = df.get("normalized_hashtags", hashtags)
-    df["brand_styles"] = tags_series.apply(lambda tags: infer_brand_styles(tags, tax_path))
+    df["brand_styles"] = [
+        infer_brand_styles(
+            tags if isinstance(tags, list) else [],
+            tax_path,
+            caption=cap,
+        )
+        for tags, cap in zip(tags_series.tolist(), caption.tolist())
+    ]
     df["product_lines"] = tags_series.apply(lambda tags: infer_product_lines(tags, tax_path))
     df["product_categories"] = [
         infer_product_categories(
@@ -277,7 +288,7 @@ def build_feature_table(
     df["embedding_method"] = emb_df["embedding_method"]
     df["embedding_model"] = emb_df["embedding_model"]
 
-    # Shared frame resolve: URL → download → 20/40/60/80% frames → CLIP + appearance
+    # Shared frame resolve: URL → download → frames → CLIP + zero-shot axes
     cover_urls = df["cover_url"].tolist() if "cover_url" in df.columns else [None] * len(df)
     cover_paths = df["cover_path"].tolist() if "cover_path" in df.columns else [None] * len(df)
     video_paths = df["video_path"].tolist() if "video_path" in df.columns else [None] * len(df)
@@ -285,12 +296,6 @@ def build_feature_table(
     page_urls = df["page_url"].tolist() if "page_url" in df.columns else [None] * len(df)
     author_usernames = (
         df["author_username"].tolist() if "author_username" in df.columns else [None] * len(df)
-    )
-    person_ratios = (
-        df["person_ratio"].tolist() if "person_ratio" in df.columns else None
-    )
-    product_ratios = (
-        df["product_ratio"].tolist() if "product_ratio" in df.columns else None
     )
     vis_rows = compute_visual_features(
         df["video_id"].tolist() if "video_id" in df.columns else [None] * len(df),
@@ -300,17 +305,21 @@ def build_feature_table(
         cover_urls=cover_urls,
         cover_paths=cover_paths,
         video_paths=video_paths,
-        person_ratios=person_ratios,
-        product_ratios=product_ratios,
         rules_path=feature_rules_path,
     )
     vis_df = pd.DataFrame(vis_rows, index=df.index)
     df["visual_embedding"] = vis_df["visual_embedding"]
     df["visual_embedding_method"] = vis_df["visual_embedding_method"]
     df["visual_embedding_model"] = vis_df["visual_embedding_model"]
-    df["appearance_type"] = vis_df["appearance_type"]
-    # Optional debug/lineage: where frames were cached (list[str])
     df["frame_paths"] = vis_df["frame_paths"]
+    from tiktok_brand.embeddings.visual_classify import classification_column_names
+
+    for col in classification_column_names(feature_rules_path):
+        if col in vis_df.columns:
+            df[col] = vis_df[col]
+    # Drop deprecated detector-based appearance_type if present from older builds
+    if "appearance_type" in df.columns:
+        df = df.drop(columns=["appearance_type"])
 
     if "content_cluster_id" not in df.columns:
         df["content_cluster_id"] = pd.NA

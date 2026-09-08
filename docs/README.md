@@ -12,6 +12,7 @@ Read in order:
 | 04 | [04-taxonomy.md](./04-taxonomy.md) | Engineers / analysts | Multi-label style / line / category cascade |
 | 05 | [05-feature-engineering.md](./05-feature-engineering.md) | Analysts | Engagement, CTA, content type, analysis dims |
 | 06 | [06-pipeline.md](./06-pipeline.md) | Engineers | How to run crawl + ETL + smoke tests |
+| — | [../notebooks/README.md](../notebooks/README.md) | Analysts | **Final analysis notebook run order** (EDA → crosstab → model → theme briefs → LLM analyst) |
 
 **Source of truth (when docs and code disagree):** code + tests + YAML under `configs/`.
 

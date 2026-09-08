@@ -9,9 +9,19 @@
 # ----------------------
 # engagement_weights      Weighted engagement: like/comment/share/collect →
 #                         weighted_engagement_count / rate / brand_relative_index
-# content_type_rules      Caption → content_type (P0–P6 classification_priority:
-#                         social_viral → … → community_collab). strong / weak /
-#                         require_pairs / bts_context
+# content_type_rules      Caption → multi-label content_type list
+#                         (all matching categories kept; CLASSIFICATION_ORDER
+#                         is output order only, not exclusive). Categories:
+#                         official_campaign, collaboration, community_impact,
+#                         story_heritage, tutorial_utility, product_review,
+#                         product_promo, product_showcase, vibe_ootd.
+# social_mechanic_rules   TikTok propagation mechanics (multi-label; parallel to
+#                         content_type): trend, challenge, pov, duet_stitch,
+#                         template_remix, audio_driven, bts, grwm_ootd_format.
+#                         Shared matcher with content_type, but social_mechanic
+#                         also allows a single weak hit when it appears as #hashtag.
+#                         strong / weak / require_pairs / bts_triggers+bts_context
+#                         Removed: social_viral, shopping_haul, community_collab
 # creator_type_keywords   author_signature → creator_type
 #                         (sports / lifestyle / fashion / beauty)
 # creator_tier_thresholds author_follower_count → creator_tier
@@ -22,8 +32,8 @@
 #                         (en_confidence_threshold, mt_enabled, mt_min_chars)
 # text_embedding          Multilingual Sentence-BERT on embedding_text (no MT)
 #                         (enabled, model_name, min_chars, batch_size)
-# visual_embedding        CLIP on cover_url/cover_path (enabled, model_name, batch_size)
-# appearance_type         CV frame-ratio thresholds when detector ratios exist
+# visual_embedding        CLIP on frames (enabled, model_name, batch_size)
+# visual_zero_shot        CLIP prompts → visual_format / visual_setting (+ scores)
 # =============================================================================
 
 engagement_weights:
@@ -32,82 +42,123 @@ engagement_weights:
   share: 0.30
   collect: 0.35   # Apify collectCount → raw collect_count (legacy CSV: save_count)
 
-# content_type: classification_priority P0–P6 (match order, not content value ranking)
+# content_type: multi-label (all matches kept; order below is stable output only)
 content_type_rules:
-  social_viral:
-    strong:
-      - ootd
-      - grwm
-      - unboxing
-      - behind the scenes
-      - tutorial
-    weak:
-      - trend
-      - trending
-      - viral
-      - meme
-      - pov
-      - challenge
-      - join the challenge
-      - trend alert
-      - tiktok trend
-      - viral trend
-      - capcut
-      - capcut template
-      - use this template
-      - duet
-      - duet this
-      - stitch
-      - stitch this
-      - sound on
-      - use this sound
-      - wait for it
-      - tell me without telling me
   official_campaign:
+    # Brand formal campaign / collection / launch (narrowed; availability → product_promo)
+    # Keep sparse: slogans / vibe copy are not campaign signals.
     strong:
       - official campaign
+      - campaign film
       - new collection
       - latest collection
-      - campaign film
       - limited edition
       - new arrival
       - new arrivals
+      - collection launch
+      - lanzamiento oficial
+      - official launch
+      - nike presents
+      - adidas presents
     weak:
-      - official
-      - officially
       - campaign
       - launch
       - launching
-      - new launch
       - just launched
       - introducing
-      - meet the
-      - collection
       - new season
       - spring collection
       - summer collection
       - fall collection
       - winter collection
-      - available now
-      - coming soon
-      - now available
-      - exclusive
-      - the new
       - debut
       - premiere
       - unveiling
       - reveal
+      - future game
+      - official release
     require_pairs:
       - [official, collection]
       - [new, launch]
-  story_heritage:
+      - [new, collection]
+  collaboration:
+    # Brand collab / creator-athlete-artist partnership (split from community_collab)
+    # Also matches structured "A x B" via content_type_rules (not bare @handles).
     strong:
-      - behind the scenes
-      - behind-the-scenes
-      - making of
-      - the making of
+      - in collaboration with
+      - in partnership with
+      - co-created with
+      - co-designed with
+      - partnered with
+      - collab
+      - signed to
+      - "ft @"
+      - "ft. @"
+      - "feat @"
+      - "feat. @"
+      - artist collaboration
+      - athlete partnership
+      - capsule collection
+      - created with adidas
+      - gifted by adidas
+      - created with nike
+      - gifted by nike
+      - nike partner
+      - adidas partner
+      - dropping a shoe with adidas
+      - dropping a shoe with nike
+    weak:
+      - collaboration
+      - collaborates with
+      - partnership
+      - team up
+      - teamed up
+      - together with
+      - co-created
+      - co-designed
+      - guest designer
+      - collab collection
+      - ambassador
+      - creator partnership
+    require_pairs:
+      - [capsule, collection]
+      - [created, with]
+      - [gifted, by]
+  community_impact:
+    # Community / charity / social impact (split from community_collab)
+    strong:
+      - giving back
+      - social impact
+      - community event
+      - charity event
+      - fundraiser
+      - volunteer program
+    weak:
+      - community
+      - our community
+      - local community
+      - charity
+      - fundraiser
+      - nonprofit
+      - volunteer
+    require_pairs:
+      - [community, event]
+      - [giving, back]
+  story_heritage:
+    # Brand history / craft / archive. BTS alone is not enough (see bts_triggers + bts_context).
+    # Skip achievement / campaign slogans (e.g. victories, legends don’t wait…).
+    strong:
       - our story
       - brand history
+      - sneaker history
+      - rich cultural heritage
+      - cultural heritage
+      - pays homage to
+      - back to day one
+      - the making of
+      - how it's made
+      - how it’s made
+      - craftsmanship
     weak:
       - heritage
       - legacy
@@ -119,30 +170,41 @@ content_type_rules:
       - origin
       - origins
       - archive
-      - from the archive
       - archival
-      - iconic
-      - icon
       - anniversary
       - milestone
       - tradition
       - timeless
+      - handcrafted
+      - workshop
+      - factory
+      - design process
+      - years later
+      - stories that go beyond
+      - peek inside the sketchbook
+      - backstory
+    bts_triggers:
+      - behind the scenes
+      - behind-the-scenes
       - bts
+      - on set
+    bts_context:
       - craftsmanship
       - handcrafted
       - workshop
       - factory
       - design process
+      - making of
+      - the making of
       - how it's made
       - how it’s made
-    bts_context:
-      - behind the scenes
-      - behind-the-scenes
-      - making of
-      - on set
-      - workshop
-      - factory
+      - heritage
+      - legacy
+      - history
+      - archive
+      - archival
   tutorial_utility:
+    # Includes non-how-to teaching cues; bare "training" is too broad — do not add.
     strong:
       - tutorial
       - how to
@@ -153,42 +215,146 @@ content_type_rules:
       - how to wear
       - how to use
       - how to clean
+      - sneaker hacks
+      - fashion hack
+      - lifehack
+      - life hack
+      - watch & learn
+      - watch and learn
+      - master the fundamentals
+      - unlock the key to
+      - customizing
+      - everything you need to know
     weak:
       - tips
       - tips and tricks
       - pro tip
       - quick tip
       - hack
-      - life hack
       - guide
       - explained
       - explainer
       - learn how
       - ways to
-      - dos and don'ts
-      - do's and don'ts
       - care guide
       - size guide
       - styling tips
       - training tips
       - workout tips
       - lace tutorial
-  shopping_haul:
+  product_review:
+    # Experience / rating / recommend (split from old shopping_haul review signals)
+    # Skip audience prompts (opinions / rate 1-10 / why so popular) as strong.
     strong:
-      - haul
-      - shopping haul
-      - try-on haul
-      - try on haul
-      - unboxing
-      - unbox
-      - unboxed
       - product review
       - honest review
+      - full review
+      - wear test
+      - performance review
+      - pros and cons
+      - shoe review
+      - shoes review
+      - sneaker review
+      - running shoe reviews
+      - running shoe review
+      - running vest review
+      - shoe recommendation
+      - shoes recommendation
+      - fashion review
+      - fit true to size
+      - worth it
+      - first run in them
+      - the reviews are actually true
+      - feel way more cushioned
+      - good for long gym sessions
+      - zero tears in the fabric
+      - trendy or tacky
+      - shoes i love to hoop in
+      - brutally honest review
     weak:
       - review
       - first impression
       - first impressions
       - reaction
+      - recommend
+      - recommendation
+      - rating
+      - 10/10
+      - 9/10
+      - would recommend
+      - tested
+      - testing
+      - super comfy
+      - they feel amazing
+      - more comfortable
+      - so comfy for the gym
+      - i'm so impressed
+      - im so impressed
+      - the worst
+  product_promo:
+    # Sales-oriented: stock / order / price / purchase CTA
+    # Do not add bare brand tags / product names / comfort praise (no conversion intent).
+    strong:
+      - shop now
+      - buy now
+      - order now
+      - dm to order
+      - dm now to order
+      - link in bio
+      - link to order
+      - hit the link in our bio
+      - linked it in my ltk
+      - affiliate link in my profile
+      - available to order
+      - cop yours now
+      - now available
+      - available in store
+      - delivery available
+      - in stock
+      - available in multiple sizes
+      - back in stock
+      - restock
+      - restocking right now
+      - on sale
+      - lowest price
+      - grab yours
+      - grab those
+    weak:
+      - available now
+      - sizes available
+      - limited stock
+      - get yours
+      - sale
+      - discount
+      - promo
+      - use code
+      - free shipping
+      - coming soon
+      - dropping
+      - official release
+      - available globally
+  product_showcase:
+    # Show the product (haul / unboxing / details / colorway) without clear review or hard sell
+    strong:
+      - product showcase
+      - closer look
+      - close-up
+      - detailed look
+      - unboxing
+      - unbox
+      - unboxed
+      - haul
+      - shopping haul
+      - try-on haul
+      - try on haul
+      - thrift haul
+      - online shopping haul
+      - shopping vlog
+      - marshalls finds
+      - on foot
+      - tiktok made me buy it
+      - debuted a new colorway
+    weak:
       - what i bought
       - what i ordered
       - what i got
@@ -196,15 +362,17 @@ content_type_rules:
       - recent purchases
       - pickup
       - pickups
-      - cop or drop
-      - worth it
-      - must-have
-      - must have
-      - recommend
-      - recommendation
-      - rating
-      - restock
-      - back in stock
+      - first look
+      - sneak peek
+      - on feet
+      - on-foot look
+      - in hand
+      - details
+      - design details
+      - colorway
+      - new colorway
+      - featuring
+      - spotlight
   vibe_ootd:
     strong:
       - ootd
@@ -219,6 +387,10 @@ content_type_rules:
       - fashion inspo
       - look inspo
       - outfit inspiration
+      - let's style
+      - lets style
+      - viral outfit
+      - what i wore to work
     weak:
       - styling
       - styled
@@ -232,51 +404,98 @@ content_type_rules:
       - lookbook
       - get the look
       - complete the look
-      - day in the life
       - aesthetic
       - vibes
-  community_collab:
+      - drip
+      - baggy style
+      - elevated look
+      - red vibe
+      - best dressed
+      - spring colours
+      - spring colors
+
+# social_mechanic: TikTok propagation / native format cues (multi-label, parallel to content_type)
+# Weak policy: >=2 weak hits, OR 1 weak appearing as #hashtag (broader than content_type).
+social_mechanic_rules:
+  trend:
     strong:
-      - in collaboration with
-      - in partnership with
-      - co-created with
-      - co-designed with
-      - brand ambassador
-      - athlete partnership
-      - artist collaboration
-      - capsule collection
+      - tiktok trend
+      - viral trend
+      - trend alert
+      - use this trend
     weak:
-      - collab
-      - collaboration
-      - collaborates with
-      - partnership
-      - partnered with
-      - partnering with
-      - team up
-      - teamed up
-      - teaming up
-      - join forces
-      - together with
-      - co-created
-      - co-designed
-      - guest designer
-      - collab collection
-      - limited collaboration
-      - ambassador
-      - creator partnership
-      - community
-      - our community
-      - local community
-      - giving back
-      - charity
-      - fundraiser
-      - nonprofit
-      - social impact
-      - community event
-      - volunteer
-    require_pairs:
-      - [community, event]
-      - [capsule, collection]
+      - trend
+      - trending
+      - viral
+  challenge:
+    strong:
+      - join the challenge
+      - take the challenge
+      - try the challenge
+      - challenge accepted
+      - show us what your victories look like
+    weak:
+      - challenge
+  pov:
+    strong:
+      - "pov:"
+      - "pov -"
+      - point of view
+    weak:
+      - pov
+  duet_stitch:
+    strong:
+      - duet this
+      - stitch this
+    weak:
+      - duet
+      - stitch
+  template_remix:
+    strong:
+      - capcut template
+      - use this template
+      - use the template
+      - green screen
+    weak:
+      - capcut
+      - template
+  audio_driven:
+    strong:
+      - use this sound
+      - use this audio
+      - use the sound
+      - sound on
+      - asmr
+    weak:
+      - viral sound
+      - trending sound
+      - trending audio
+      - audio trend
+  bts:
+    strong:
+      - behind the scenes
+      - behind-the-scenes
+      - making of
+      - the making of
+      - go behind the scenes
+      - go behind-the-scenes
+      - behind the design
+      - fun on set
+      - bts of
+      - peek inside
+    weak:
+      - bts
+      - on set
+      - backstage
+  grwm_ootd_format:
+    strong:
+      - get ready with me
+      - outfit of the day
+      - fit check
+    weak:
+      - grwm
+      - ootd
+      - fitcheck
 
 creator_type_keywords:
   sports: [sport, fitness, athlete, gym, running, training, workout]
@@ -303,11 +522,16 @@ sentiment:
   # Provider: deep-translator GoogleTranslator (network). Inject translate_fn in tests.
 
 # Text embeddings: multilingual Sentence-BERT (no MT; encode original embedding_text)
+# Used for modeling / ablation. Do not replace with cluster_* fields.
 text_embedding:
   enabled: true
   model_name: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
   min_chars: 3
   batch_size: 32
+# Clustering-only text: scripts/enrich_cluster_embeddings.py builds
+# cluster_embedding_text (scrubbed caption + split-only hashtags, no [HASHTAGS])
+# and cluster_text_embedding (same SBERT model). Original columns stay intact.
+
 
 # Visual embeddings: assemble TikTok URL → download MP4 → 4 frames @ 20/40/60/80%
 visual_embedding:
@@ -322,9 +546,71 @@ visual_embedding:
   # Optional: chrome|safari|firefox — or env YTDLP_COOKIES_FROM_BROWSER / enrich --cookies-from-browser
   cookies_from_browser: null
 
-appearance_type:
-  # Used when person/product frame ratios are supplied by a future CV step
-  person_ratio: 0.6
-  product_only_ratio: 0.6
-  mixed_min_ratio: 0.2
-  other_ratio: 0.6
+# CLIP zero-shot visual axes (replaces appearance_type / person-product ratios).
+# Scoring: per frame mean(3 prompt sims) → video mean over valid frames.
+# Embeddings must be L2-normalized (encode uses normalize_embeddings=True).
+# No frames → labels unknown; do not score against prompts.
+visual_zero_shot:
+  enabled: true
+  visual_format:
+    product_closeup:
+      - a close-up shot focused mainly on shoes, clothing, sportswear, or accessories
+      - a product-focused image where footwear, apparel, or accessories are the main visual subject
+      - a detailed close-up view of a sports or fashion product with little emphasis on the person wearing it
+    on_body_styling:
+      - a person wearing and showing clothing, shoes, or sportswear on their body
+      - a fashion or outfit styling scene showing how apparel or footwear looks when worn
+      - a model or creator presenting an outfit, OOTD, clothing look, or on-body product styling
+    sports_action:
+      - an athlete actively performing a sport, exercise, or athletic movement
+      - a person running, jumping, training, playing basketball, football, or doing a workout
+      - a dynamic sports scene showing physical movement, competition, training, or athletic performance
+    talking_head:
+      - a person speaking directly to the camera in a talking-head style
+      - a person giving an interview, explanation, commentary, or direct-to-camera presentation
+      - a close or medium shot of someone talking to the viewer or being interviewed
+    campaign_visual:
+      - a polished professional brand campaign or commercial advertisement
+      - a highly produced editorial or promotional fashion and sportswear visual
+      - a cinematic branded marketing image with professional styling, lighting, and art direction
+    archival_retro:
+      - archival, historical, vintage, or retro visual footage
+      - an old photograph, old advertisement, historical sports footage, or nostalgic brand visual
+      - a vintage or archival image with a historical, retro, or old-media appearance
+    other:
+      - a visual scene that does not clearly match product close-up, styling, sports action, talking head, campaign, or archival content
+      - a miscellaneous visual format outside the main product, fashion, sports, speaking, advertising, or archival categories
+      - a general visual scene with no clear dominant format from the defined categories
+  visual_setting:
+    studio:
+      - a professional photography studio or controlled commercial filming set
+      - an indoor studio environment with staged lighting, backdrop, or production setup
+      - a polished controlled shooting environment such as a photo studio, seamless backdrop, or advertising set
+    outdoor:
+      - an outdoor environment such as a street, city, park, road, or natural landscape
+      - an open-air scene filmed outside in an urban, street, park, nature, or outdoor location
+      - a person or product shown in an outdoor environment under natural surroundings or open sky
+    gym_training:
+      - a gym, fitness center, workout room, or indoor training facility
+      - an exercise or training environment with gym equipment, weights, machines, or workout areas
+      - a fitness or athletic training space used for workouts, strength training, or exercise practice
+    sports_venue:
+      - a sports venue such as a basketball court, football field, running track, stadium, or arena
+      - an athletic competition or practice location such as a court, field, track, stadium, or sports arena
+      - a dedicated sports facility where games, matches, races, or athletic activities take place
+    event_crowd:
+      - a live event, public gathering, audience, or crowded event environment
+      - a launch event, concert, sports event, public gathering, or scene with a visible crowd
+      - an event setting with spectators, audience members, attendees, or a large group of people
+    home_indoor:
+      - a casual home or everyday indoor environment such as a bedroom, living room, or kitchen
+      - an ordinary indoor living space with a home-like or personal environment
+      - a domestic or casual indoor scene rather than a studio, store, gym, or event space
+    retail_store:
+      - a retail store, clothing shop, sneaker store, branded shop, or showroom
+      - an indoor shopping environment with products displayed on shelves, racks, walls, or retail fixtures
+      - a branded retail or showroom space where apparel, shoes, or other products are displayed for sale
+    other:
+      - an identifiable environment that does not clearly match studio, outdoor, gym, sports venue, event, home, or retail store
+      - a miscellaneous setting outside the main defined environment categories
+      - a visible scene with no clear match to the predefined studio, outdoor, training, sports, event, home, or retail settings

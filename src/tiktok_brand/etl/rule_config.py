@@ -24,6 +24,12 @@ def get_content_type_rules(path: str = str(DEFAULT_RULES_PATH)) -> Dict[str, Dic
 
 
 @lru_cache(maxsize=1)
+def get_social_mechanic_rules(path: str = str(DEFAULT_RULES_PATH)) -> Dict[str, Dict[str, Any]]:
+    rules = load_feature_rules(path)
+    return rules.get("social_mechanic_rules") or {}
+
+
+@lru_cache(maxsize=1)
 def get_engagement_weights(path: str = str(DEFAULT_RULES_PATH)) -> Tuple[float, float, float, float]:
     rules = load_feature_rules(path)
     w = rules.get("engagement_weights") or {}

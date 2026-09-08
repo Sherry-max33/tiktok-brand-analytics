@@ -143,17 +143,53 @@ Multi-label (regex in `cta_rules.py`):
 - `has_promo_language` (orthogonal; not OR’d into `has_cta`)
 - `has_cta` = purchase ∨ engagement ∨ discovery
 
-## Content type (P0–P6)
+## Content type (rule-defined, **multi-label**)
 
-Match order in `content_type_rules` (classification priority, not quality ranking):
+`content_type` is a **list** of all matching categories (empty = no hit / unknown).
+Categories are **not** mutually exclusive — e.g. a video can be both `product_review` and `vibe_ootd`.
 
-1. `social_viral`
-2. `official_campaign`
-3. `story_heritage`
-4. `tutorial_utility`
-5. `shopping_haul`
-6. `vibe_ootd`
-7. `community_collab`
+Stable output order (for readability / one-hot column order only, **not** winner-take-all):
+
+1. `official_campaign`
+2. `collaboration`
+3. `community_impact`
+4. `story_heritage`
+5. `tutorial_utility`
+6. `product_review`
+7. `product_promo`
+8. `product_showcase`
+9. `vibe_ootd`
+
+Removed / remapped:
+
+- `social_viral` — dropped (platform viral cues alone are not a content category)
+- `shopping_haul` → mostly `product_showcase`; review language → `product_review`; restock/CTA → `product_promo`
+- `community_collab` → split into `collaboration` + `community_impact`
+
+Reports should call this a **rule-defined content category** (multi-label; mix of format / purpose / narrative). Parallel to semantic `content_cluster_*`.
+
+For modeling, expand to one-hot flags (`is_content_*`) via `content_types_to_flags`.
+
+## Social mechanic (TikTok propagation, **multi-label**)
+
+Parallel axis to `content_type` — **intent vs platform form**:
+
+| Field | Answers |
+|-------|---------|
+| `content_type` | What kind of branded/content intent? (review, campaign, OOTD intent, …) |
+| `social_mechanic` | Which TikTok propagation / native format cues? (trend, challenge, BTS form, GRWM/OOTD format, …) |
+
+Same surface words can appear in both with different meaning, e.g.:
+
+- `content_type=[vibe_ootd]` + `social_mechanic=[grwm_ootd_format]`
+- `content_type=[official_campaign]` + `social_mechanic=[bts]`
+
+Mechanics (stable order): `trend`, `challenge`, `pov`, `duet_stitch`, `template_remix`, `audio_driven`, `bts`, `grwm_ootd_format`.
+
+Matching:
+
+- `content_type`: strong / `require_pairs` / **≥2 weak** (single weak never fires)
+- `social_mechanic`: same, **plus** a single weak hit if it appears as a hashtag (`#viral`, `#trend`, …)
 
 ## Creator
 
@@ -188,7 +224,7 @@ Match order in `content_type_rules` (classification priority, not quality rankin
 |-----------|-------|
 | Rule type | `content_type` |
 | Cluster (experimental) | `content_cluster_id` |
-| Appearance (CV stub) | `appearance_type` |
+| Visual format / setting | `visual_format`, `visual_setting` (+ scores / margin / status) |
 | Duration / music | `video_duration_sec`, `has_music`, `music_id` |
 | Sample trending audio | `is_sample_trending_audio` |
 
@@ -196,7 +232,7 @@ Match order in `content_type_rules` (classification priority, not quality rankin
 
 | Dimension | Field | Notes |
 |-----------|-------|-------|
-| Styles | `brand_styles` | list; `[]` = unrecognized |
+| Styles | `brand_styles` | multi-label list; seed-hashtag prior ∪ style keywords; `[]` = unrecognized; flags via `brand_styles_to_flags` |
 | Lines | `product_lines` | list; `[]` = unrecognized |
 | Categories | `product_categories` | list; always includes at least one label |
 
@@ -233,7 +269,7 @@ Two consumers, **one** extraction:
 | Consumer | Output |
 |----------|--------|
 | CLIP | `visual_embedding` (+ method/model) |
-| Appearance | `appearance_type` |
+| Zero-shot axes | `visual_format`, `visual_setting` (+ `vf_*`/`vs_*` scores) |
 
 Pipeline:
 
@@ -241,7 +277,7 @@ Pipeline:
 page_url / video_url / @user/video/{id}
         → yt-dlp download (VISUAL_DOWNLOAD=1 or download_video: true)
         → 4 frames at 20% / 40% / 60% / 80%
-        → CLIP + appearance_type
+        → CLIP + visual_format / visual_setting (zero-shot prompts)
 ```
 
 Cache: `data/processed/frames/{video_id}/video.mp4` + `frame_000.jpg`…`frame_003.jpg`.  

@@ -8,6 +8,8 @@ from typing import Any, Dict, List, Optional, Sequence
 
 import yaml
 
+from .keyword_match import contains_phrase
+
 DEFAULT_TAXONOMY_PATH = Path("configs/taxonomy.yaml")
 
 # Fixed display / analysis order (not mutually exclusive within a field)
@@ -35,19 +37,63 @@ def _ordered_unique(values: Sequence[str], order: Optional[Sequence[str]] = None
     return sorted(collected, key=lambda x: (rank.get(x, len(rank)), x))
 
 
+def _evidence_text(caption: Optional[str], tags: Optional[List[str]]) -> str:
+    parts: List[str] = []
+    if caption:
+        parts.append(str(caption).lower())
+    for t in tags or []:
+        raw = str(t).strip().lstrip("#").lower()
+        if raw:
+            parts.append(f"#{raw}")
+            parts.append(raw)
+    return " ".join(parts)
+
+
 def infer_brand_styles(
-    tags: Optional[List[str]], path: str = str(DEFAULT_TAXONOMY_PATH)
+    tags: Optional[List[str]] = None,
+    path: str = str(DEFAULT_TAXONOMY_PATH),
+    *,
+    caption: Optional[str] = None,
 ) -> List[str]:
-    """All matching brand styles (deduped, fixed order). Empty = unrecognized."""
-    style_map = {
-        str(k).lower(): str(v) for k, v in (load_taxonomy(path).get("brand_style_map") or {}).items()
+    """
+    Multi-label brand positioning = crawl-seed hashtag prior ∪ caption/hashtag keywords.
+
+    Does **not** map product SKUs (samba/gazelle) to style — only seed_style_map
+    + style_keywords evidence. Seed tags come from configs/hashtags.yaml, not @accounts.
+    """
+    cfg = load_taxonomy(path)
+    # Prefer seed_style_map; fall back to short-lived aliases if present.
+    seed_map = {
+        str(k).lower(): str(v)
+        for k, v in (
+            cfg.get("seed_style_map")
+            or cfg.get("account_style_map")
+            or cfg.get("brand_style_map")
+            or {}
+        ).items()
     }
+    style_kw = cfg.get("style_keywords") or {}
+
     hits: List[str] = []
     for t in tags or []:
-        key = str(t).lower()
-        if key in style_map:
-            hits.append(style_map[key])
+        key = str(t).lower().lstrip("#")
+        if key in seed_map:
+            hits.append(seed_map[key])
+
+    text = _evidence_text(caption, tags)
+    if text.strip():
+        for style in BRAND_STYLE_ORDER:
+            phrases = style_kw.get(style) or []
+            if any(contains_phrase(text, str(p)) for p in phrases):
+                hits.append(style)
+
     return _ordered_unique(hits, BRAND_STYLE_ORDER)
+
+
+def brand_styles_to_flags(labels: Optional[Sequence[str]]) -> Dict[str, bool]:
+    """One-hot flags for modeling (all known styles)."""
+    present = set(labels or [])
+    return {f"brand_style_{s}": (s in present) for s in BRAND_STYLE_ORDER}
 
 
 def infer_product_lines(
@@ -76,14 +122,21 @@ def infer_product_categories(
     Cascaded multi-label categories (see configs/taxonomy.yaml):
 
       1) If product_lines non-empty → map each via line_to_category_map
-      2) Else scan hashtags → product_category_map (+ accessories tags)
-      3) Else caption / accessories keyword heuristics
+      2) Else hashtag scan (strong maps + apparel product terms; weak fashion
+         tags alone do not assign apparel)
+      3) Else caption heuristics (strong apparel terms; weak fashion needs strong)
       4) Else → ["uncategorized"]
     """
     cfg = load_taxonomy(path)
     line_to_category = {str(k): str(v) for k, v in (cfg.get("line_to_category_map") or {}).items()}
     category_map = {
         str(k).lower(): str(v) for k, v in (cfg.get("product_category_map") or {}).items()
+    }
+    apparel_terms = {
+        str(x).lower().lstrip("#") for x in (cfg.get("category_apparel_product_terms") or [])
+    }
+    weak_fashion = {
+        str(x).lower().lstrip("#") for x in (cfg.get("category_weak_fashion_tags") or [])
     }
     caption_kw = cfg.get("category_caption_keywords") or {}
     accessories = [str(k).lower() for k in (cfg.get("accessories_keywords") or [])]
@@ -96,23 +149,42 @@ def infer_product_categories(
         out = _ordered_unique(hits, PRODUCT_CATEGORY_ORDER)
         return out if out else ["uncategorized"]
 
-    # (2) else hashtag → product_category_map
+    # (2) hashtag scan
+    tag_keys = [str(t).lower().lstrip("#") for t in (tags or []) if str(t).strip()]
     hits: List[str] = []
-    for tag in tags or []:
-        t = str(tag).lower()
+    has_weak_fashion = False
+    has_apparel_term = False
+    for t in tag_keys:
+        if t in weak_fashion:
+            has_weak_fashion = True
+            continue  # never map weak fashion alone via category_map
         if t in category_map:
             hits.append(category_map[t])
+        if t in apparel_terms:
+            has_apparel_term = True
+            hits.append("apparel")
         if t in accessories:
             hits.append("accessories")
+
+    # weak fashion + explicit apparel product term → apparel (term already added;
+    # keep explicit for clarity / future multi-signal rules)
+    if has_weak_fashion and has_apparel_term:
+        hits.append("apparel")
+
     if hits:
         return _ordered_unique(hits, PRODUCT_CATEGORY_ORDER)
 
-    # (3) else caption heuristics
+    # (3) caption heuristics
     text = str(caption or "").lower()
-    for word in caption_kw.get("apparel") or []:
-        if word in text:
-            hits.append("apparel")
-            break
+    apparel_strong = [str(w).lower() for w in (caption_kw.get("apparel") or [])]
+    apparel_weak = [str(w).lower() for w in (caption_kw.get("apparel_weak") or [])]
+    has_apparel_strong = any(word in text for word in apparel_strong)
+    has_apparel_weak = any(word in text for word in apparel_weak)
+    if has_apparel_strong:
+        hits.append("apparel")
+    elif has_apparel_weak and has_apparel_term:
+        # caption weak fashion + hashtag apparel product term
+        hits.append("apparel")
     for word in caption_kw.get("shoes") or []:
         if word in text:
             hits.append("shoes")

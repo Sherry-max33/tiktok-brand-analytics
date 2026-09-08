@@ -1,7 +1,7 @@
-"""Visual embeddings (CLIP) + appearance_type from a shared frame cache.
+"""Visual embeddings (CLIP) + zero-shot visual_format / visual_setting.
 
 Frame extraction / cover download happens once via ``frames.resolve_video_frames``.
-CLIP and appearance inference both consume those local paths — never extract twice.
+CLIP image encode, caption alignment, and zero-shot axes all reuse those paths.
 """
 
 from __future__ import annotations
@@ -13,12 +13,14 @@ from typing import Callable, List, Optional, Sequence, Union
 
 from ..etl.rule_config import load_feature_rules
 from .frames import DEFAULT_FRAME_FRACTIONS, resolve_frames_batch
+from .visual_classify import classify_frame_vectors, empty_classification
 
 logger = logging.getLogger(__name__)
 
 METHOD_CLIP = "clip_visual"
 METHOD_NOT_EMBEDDED = "not_embedded"
 
+# Deprecated appearance_type constants (kept for old imports).
 APPEARANCE_UNKNOWN = "unknown"
 APPEARANCE_PERSON_PRESENT = "person_present"
 APPEARANCE_PRODUCT_ONLY = "product_only"
@@ -33,10 +35,6 @@ _MODEL_NAME: Optional[str] = None
 
 def _visual_cfg(rules_path: str = "configs/feature_rules.yaml") -> dict:
     return load_feature_rules(rules_path).get("visual_embedding") or {}
-
-
-def _appearance_cfg(rules_path: str = "configs/feature_rules.yaml") -> dict:
-    return load_feature_rules(rules_path).get("appearance_type") or {}
 
 
 def _enabled(rules_path: str = "configs/feature_rules.yaml") -> bool:
@@ -67,7 +65,6 @@ def _frame_fractions(rules_path: str = "configs/feature_rules.yaml") -> list[flo
     n = _max_frames(rules_path)
     if n == 4:
         return list(DEFAULT_FRAME_FRACTIONS)
-    # evenly spaced interior points as fallback
     return [round((i + 1) / (n + 1), 4) for i in range(n)]
 
 
@@ -158,7 +155,6 @@ def _mean_vector(vectors: List[List[float]]) -> List[float]:
             acc[i] += float(x)
     n = float(len(vectors))
     mean = [x / n for x in acc]
-    # re-L2 normalize
     norm = sum(x * x for x in mean) ** 0.5
     if norm <= 0:
         return mean
@@ -172,18 +168,15 @@ def infer_appearance_type(
     product_ratio: Optional[float] = None,
     rules_path: str = "configs/feature_rules.yaml",
 ) -> str:
-    """Map optional detector ratios to appearance_type; else unknown/other."""
+    """Deprecated stub. Prefer visual_format / visual_setting zero-shot."""
     if not has_image:
         return APPEARANCE_UNKNOWN
-
-    cfg = _appearance_cfg(rules_path)
+    if person_ratio is None or product_ratio is None:
+        return APPEARANCE_OTHER
+    cfg = load_feature_rules(rules_path).get("appearance_type") or {}
     person_thr = float(cfg.get("person_ratio", 0.6))
     product_thr = float(cfg.get("product_only_ratio", 0.6))
     mixed_min = float(cfg.get("mixed_min_ratio", 0.2))
-
-    if person_ratio is None or product_ratio is None:
-        return APPEARANCE_OTHER
-
     person_hi = person_ratio >= person_thr
     product_hi = product_ratio >= product_thr
     if person_hi and product_hi:
@@ -235,7 +228,7 @@ def _alignment_stats(
     text_vec: List[float], frame_vecs: List[List[float]]
 ) -> dict:
     sims = [_cosine(text_vec, fv) for fv in frame_vecs]
-    sims = [s for s in sims if s == s]  # drop NaN
+    sims = [s for s in sims if s == s]
     if not sims:
         return {
             "clip_alignment_mean": None,
@@ -255,6 +248,26 @@ def _alignment_stats(
     }
 
 
+def _blank_visual_row(expected_frames: int, rules_path: str) -> dict:
+    empty_align = {
+        "clip_alignment_mean": None,
+        "clip_alignment_max": None,
+        "clip_alignment_min": None,
+        "clip_alignment_std": None,
+        "clip_text_embedding": None,
+    }
+    return {
+        "visual_embedding": None,
+        "visual_embedding_method": METHOD_NOT_EMBEDDED,
+        "visual_embedding_model": None,
+        "frame_paths": [],
+        **empty_align,
+        **empty_classification(
+            expected_frames=expected_frames, valid_frames=0, rules_path=rules_path
+        ),
+    }
+
+
 def compute_visual_features(
     video_ids: Sequence[Optional[str]],
     *,
@@ -270,36 +283,20 @@ def compute_visual_features(
     product_ratios: Optional[Sequence[Optional[float]]] = None,
     rules_path: str = "configs/feature_rules.yaml",
     encode_images_fn: Optional[EncodeImagesFn] = None,
+    encode_texts_fn: Optional[Callable] = None,
 ) -> List[dict]:
     """
-    Single entry for visual_embedding + appearance_type (+ optional CLIP alignment).
+    Frames → CLIP visual_embedding (+ optional caption alignment)
+    + zero-shot visual_format / visual_setting scores.
 
-    Resolves frames once per video:
-      assemble URL → download MP4 (optional) → extract 20/40/60/80% frames → CLIP + appearance
-
-    If ``captions_en`` is provided, also encodes CLIP text (same checkpoint) and
-    writes clip_alignment_{mean,max,min,std} vs per-frame image vectors.
+    ``person_ratios`` / ``product_ratios`` are ignored (legacy appearance_type removed).
     """
+    _ = person_ratios, product_ratios  # legacy unused
     model_name = _model_name(rules_path)
+    fractions = _frame_fractions(rules_path)
+    expected_frames = len(fractions)
     n = len(video_ids)
-    empty_align = {
-        "clip_alignment_mean": None,
-        "clip_alignment_max": None,
-        "clip_alignment_min": None,
-        "clip_alignment_std": None,
-        "clip_text_embedding": None,
-    }
-    out: List[dict] = [
-        {
-            "visual_embedding": None,
-            "visual_embedding_method": METHOD_NOT_EMBEDDED,
-            "visual_embedding_model": None,
-            "appearance_type": APPEARANCE_UNKNOWN,
-            "frame_paths": [],
-            **empty_align,
-        }
-        for _ in range(n)
-    ]
+    out: List[dict] = [_blank_visual_row(expected_frames, rules_path) for _ in range(n)]
 
     if not _enabled(rules_path):
         return out
@@ -314,15 +311,14 @@ def compute_visual_features(
             cover_paths=cover_paths,
             video_paths=video_paths,
             frames_root=_frames_root(rules_path),
-            fractions=_frame_fractions(rules_path),
+            fractions=fractions,
             download_video=_download_video_enabled(rules_path),
             max_height=_download_max_height(rules_path),
             cookies_from_browser=_cookies_from_browser(rules_path),
         )
 
-    # Flatten images for one encode pass
     flat_images: List[object] = []
-    owners: List[int] = []  # row index per image
+    owners: List[int] = []
     local_paths: List[List[str]] = [list(x or []) for x in frame_paths_per_video]
 
     for i, paths in enumerate(local_paths):
@@ -350,7 +346,8 @@ def compute_visual_features(
         except Exception as exc:
             logger.warning("visual embedding failed: %s", exc)
 
-    # Optional CLIP text encodings (same model / shared space)
+    text_encode = encode_texts_fn or _default_encode_texts
+
     text_vecs: List[Optional[List[float]]] = [None] * n
     if captions_en is not None:
         text_jobs: List[tuple[int, str]] = []
@@ -363,7 +360,7 @@ def compute_visual_features(
             text_jobs.append((i, text))
         if text_jobs:
             try:
-                encoded = _default_encode_texts(
+                encoded = text_encode(
                     [t for _, t in text_jobs],
                     model_name=model_name,
                     batch_size=_batch_size(rules_path),
@@ -373,18 +370,16 @@ def compute_visual_features(
             except Exception as exc:
                 logger.warning("CLIP text embedding failed: %s", exc)
 
+    empty_align = {
+        "clip_alignment_mean": None,
+        "clip_alignment_max": None,
+        "clip_alignment_min": None,
+        "clip_alignment_std": None,
+        "clip_text_embedding": None,
+    }
+
     for i in range(n):
         paths = local_paths[i]
-        has_image = bool(paths) or bool(vectors_by_row[i])
-        pr = person_ratios[i] if person_ratios and i < len(person_ratios) else None
-        prod = product_ratios[i] if product_ratios and i < len(product_ratios) else None
-        appearance = infer_appearance_type(
-            has_image=has_image,
-            person_ratio=pr,
-            product_ratio=prod,
-            rules_path=rules_path,
-        )
-
         vecs = vectors_by_row[i]
         align = dict(empty_align)
         if text_vecs[i] is not None and vecs:
@@ -392,22 +387,34 @@ def compute_visual_features(
         elif text_vecs[i] is not None:
             align["clip_text_embedding"] = text_vecs[i]
 
-        if not vecs:
-            out[i].update(
-                {
-                    "appearance_type": appearance if has_image else APPEARANCE_UNKNOWN,
-                    **align,
-                }
+        try:
+            classified = classify_frame_vectors(
+                vecs,
+                rules_path=rules_path,
+                expected_frames=expected_frames,
+                model_name=model_name,
+                batch_size=_batch_size(rules_path),
+                encode_texts_fn=text_encode,
             )
+        except Exception as exc:
+            logger.warning("visual zero-shot failed for row %s: %s", i, exc)
+            classified = empty_classification(
+                expected_frames=expected_frames,
+                valid_frames=len(vecs),
+                rules_path=rules_path,
+            )
+
+        if not vecs:
+            out[i].update({**align, **classified})
             continue
 
         out[i] = {
             "visual_embedding": _mean_vector(vecs),
             "visual_embedding_method": METHOD_CLIP,
             "visual_embedding_model": model_name,
-            "appearance_type": appearance,
             "frame_paths": paths,
             **align,
+            **classified,
         }
     return out
 
@@ -419,7 +426,6 @@ def compute_visual_embeddings(
     encode_images_fn: Optional[EncodeImagesFn] = None,
 ) -> List[dict]:
     """Back-compat: treat each source as a direct local video/cover path."""
-    n = len(cover_sources)
     video_ids = [f"direct_{i}" if s else None for i, s in enumerate(cover_sources)]
     video_paths = []
     cover_paths = []
@@ -434,7 +440,6 @@ def compute_visual_embeddings(
             cover_paths.append(None)
             cover_urls.append(str(s))
         else:
-            # local file — prefer as video_path for fraction extraction
             video_paths.append(str(s))
             cover_paths.append(None)
             cover_urls.append(None)

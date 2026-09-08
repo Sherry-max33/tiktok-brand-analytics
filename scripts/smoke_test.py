@@ -155,9 +155,9 @@ def validate_feature_df(df: pd.DataFrame) -> list[str]:
             if known_rate < 0.20:
                 errors.append(f"product_categories known-rate too low: {known_rate:.1%} (<20%)")
 
-        # content_type hit-rate
+        # content_type hit-rate (multi-label list)
         if "content_type" in df.columns:
-            hit = _rate_non_empty_str(df["content_type"])
+            hit = _rate_non_empty_list(df["content_type"])
             if hit < 0.10:
                 errors.append(f"content_type hit-rate too low: {hit:.1%} (<10%)")
 

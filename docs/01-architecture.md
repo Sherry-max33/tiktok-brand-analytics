@@ -70,7 +70,7 @@ Hashtag seeds + official accounts
 
 - Engagement count / rate / weighted metrics / brand-relative index
 - CTA multi-flags (`has_cta`, purchase / engagement / discovery / promo)
-- `content_type` (P0–P6 keyword rules)
+- `content_type` (multi-label keyword rules)
 - Creator type & tier
 - Taxonomy: `brand_styles` → `product_lines` → `product_categories` (cascaded)
 - Placeholders: `visual_embedding`, `appearance_type`, `content_cluster_id`

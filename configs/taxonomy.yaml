@@ -7,30 +7,46 @@
 #
 # Matching
 # --------
-# brand_styles / product_lines:
+# brand_styles (multi-label positioning — NOT product-name → style):
+#   seed_style_map: crawl seed hashtag prior (nikerunning → performance)
+#   style_keywords: caption + hashtag evidence per style
+#   Final = union(seed hits, keyword hits); [] = unrecognized
+#   Example: running-tech video → [performance, technical]
+#            Samba street fit → [retro, lifestyle]
+#
+# product_lines:
 #   Scan ALL normalized hashtags; collect every hit; dedupe; fixed sort.
 #   Empty list [] = unrecognized.
 #
 # product_categories (cascaded — first non-empty layer wins):
 #   (1) If product_lines non-empty → map each via line_to_category_map
 #       e.g. tech_fleece → apparel, samba → shoes
-#   (2) Else scan hashtags → product_category_map (+ accessories_keywords on tags)
-#       e.g. nikeshoes → shoes, nikeoutfit → apparel
-#   (3) Else caption heuristics (category_caption_keywords + accessories_keywords)
-#       apparel: fit/wear/outfit/… ; shoes: shoe/sneaker/… ; accessories: bag/socks/…
+#   (2) Else hashtag scan:
+#       - product_category_map (seed tags like nikeoutfit → apparel)
+#       - category_apparel_product_terms (jacket/pants/shirt → apparel)
+#       - accessories_keywords on tags
+#       - category_weak_fashion_tags (ootd/fashion/streetwear) NEVER alone:
+#           ootd + jacket → apparel; ootd + sneakers → shoes (via shoes map);
+#           ootd alone → no category from this layer
+#   (3) Else caption heuristics (strong product terms only for apparel)
 #   (4) Else → ["uncategorized"]
 #
 # Index (top-level keys, same order as feature compute)
 # ----------------------------------------------------
-# brand_style_map            tag → brand_style
-# product_line_map           tag → product_line
-# product_category_map       tag → shoes / apparel / accessories
-# line_to_category_map       product_line → product_category
-# category_caption_keywords  caption heuristics (layer ③)
-# accessories_keywords       caption/tag → accessories
+# seed_style_map                  crawl seed hashtag → brand_style prior
+# style_keywords                  caption/hashtag evidence → brand_style
+# product_line_map                tag → product_line
+# product_category_map            tag → shoes / apparel / accessories (strong)
+# category_apparel_product_terms  explicit apparel product tags
+# category_weak_fashion_tags      fashion/style cues (pair with strong evidence)
+# line_to_category_map            product_line → product_category
+# category_caption_keywords       caption heuristics (layer ③)
+# accessories_keywords            caption/tag → accessories
 # =============================================================================
 
-brand_style_map:
+# Crawl seed hashtag prior (configs/hashtags.yaml seeds — not TikTok @accounts,
+# and not product SKUs like samba → retro).
+seed_style_map:
   nikerunning: performance
   niketraining: performance
   nikebasketball: performance
@@ -42,37 +58,109 @@ brand_style_map:
   adidastraining: performance
   adidasoriginals: lifestyle
   adidasstyle: lifestyle
-  adidassamba: retro
-  adidasgazelle: retro
+
+# Caption + hashtag evidence (multi-label; union with seed_style_map).
+style_keywords:
+  performance:
+    - training
+    - race
+    - speed
+    - athlete
+    - performance
+    - marathon
+    - court
+    - match
+  lifestyle:
+    - outfit
+    - ootd
+    - streetwear
+    - styling
+    - fit check
+    - everyday look
+  technical:
+    - cushioning
+    - foam
+    - technology
+    - engineered
+    - material
+    - innovation
+  retro:
+    - retro
+    - vintage
+    - classic
+    - archive
+    - heritage
+    - throwback
+    - og
 
 product_line_map:
   niketech: tech_fleece
   jordan: jordan
+  jordanbrand: jordan
   airmax: air_max
+  nikeairmax: air_max
+  airmax95: air_max
   nikedunk: dunk
+  dunks: dunk
   airforce1: af1
   adidassamba: samba
+  samba: samba
+  sambas: samba
   adidasgazelle: gazelle
+  gazelle: gazelle
   adidasspezial: spezial
+  spezial: spezial
   ultraboost: ultraboost
   adidasforum: forum
   adidasoriginals: originals_apparel
   tracksuit: tracksuit
+  # New lines (footwear families)
+  f50: f50
+  predator: predator
+  adidassuperstar: superstar
+  adizero: adizero
 
 product_category_map:
   nikeshoes: shoes
   nikesneakers: shoes
   jordan: shoes
+  jordanbrand: shoes
   airmax: shoes
+  nikeairmax: shoes
+  airmax95: shoes
   af1: shoes
   airforce1: shoes
   nikedunk: shoes
+  dunks: shoes
   adidasshoes: shoes
   adidassamba: shoes
+  samba: shoes
+  sambas: shoes
   adidasgazelle: shoes
+  gazelle: shoes
   adidasspezial: shoes
+  spezial: shoes
   adidasforum: shoes
   ultraboost: shoes
+  f50: shoes
+  predator: shoes
+  adidassuperstar: shoes
+  adizero: shoes
+  sneakers: shoes
+  sneaker: shoes
+  sneakerhead: shoes
+  sneakerheads: shoes
+  sneakersaddict: shoes
+  sneakertok: shoes
+  shoes: shoes
+  shoe: shoes
+  newshoes: shoes
+  runningshoes: shoes
+  basketballshoes: shoes
+  footballboots: shoes
+  soccercleats: shoes
+  cleats: shoes
+  zapatillas: shoes
   niketech: apparel
   nikeoutfit: apparel
   nikefit: apparel
@@ -81,6 +169,39 @@ product_category_map:
   adidaslook: apparel
   adidasstyle: apparel
   tracksuit: apparel
+
+# Explicit apparel product terms (hashtag). Alone → apparel.
+category_apparel_product_terms:
+  - jacket
+  - jackets
+  - pants
+  - shirt
+  - shirts
+  - hoodie
+  - hoodies
+  - sweatshirt
+  - sweatpants
+  - tracksuit
+  - shorts
+  - dress
+  - skirt
+  - coat
+  - blazer
+
+# Fashion/style cues: NEVER assign apparel alone.
+# ootd + jacket/pants/shirt → apparel (via product terms)
+# ootd + sneakers/shoes → shoes (via product_category_map)
+category_weak_fashion_tags:
+  - ootd
+  - fashion
+  - streetwear
+  - outfitinspo
+  - fashiontiktok
+  - style
+  - outfit
+  - outfits
+  - lookbook
+  - grwm
 
 line_to_category_map:
   tech_fleece: apparel
@@ -95,21 +216,45 @@ line_to_category_map:
   forum: shoes
   originals_apparel: apparel
   tracksuit: apparel
+  f50: shoes
+  predator: shoes
+  superstar: shoes
+  adizero: shoes
 
 category_caption_keywords:
+  # Strong apparel product wording only (not bare outfit/ootd/fashion/look/fit/wear).
   apparel:
-    - fit
-    - wear
-    - outfit
     - jacket
+    - shirts
     - shirt
     - pants
-    - look
+    - hoodie
+    - sweatshirt
+    - sweatpants
+    - tracksuit
+    - shorts
+    - dress
+    - skirt
+    - coat
+    - blazer
   shoes:
     - shoe
     - sneaker
     - kicks
     - pair
+    - cleats
+    - boots
+  # Weak fashion words in caption need a strong apparel term also present.
+  apparel_weak:
+    - outfit
+    - ootd
+    - fashion
+    - streetwear
+    - look
+    - fit
+    - wear
+    - style
+    - grwm
 
 accessories_keywords:
   - bag

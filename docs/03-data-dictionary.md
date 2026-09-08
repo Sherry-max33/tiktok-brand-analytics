@@ -153,7 +153,8 @@ Regex lives in `cta_rules.py`, not YAML.
 
 | Field | Values / notes |
 |-------|----------------|
-| `content_type` | P0–P6: `social_viral` … `community_collab` |
+| `content_type` | Multi-label list of rule-defined categories: `official_campaign`, `collaboration`, `community_impact`, `story_heritage`, `tutorial_utility`, `product_review`, `product_promo`, `product_showcase`, `vibe_ootd` (empty list = no hit) |
+| `social_mechanic` | Multi-label TikTok propagation/format cues: `trend`, `challenge`, `pov`, `duet_stitch`, `template_remix`, `audio_driven`, `bts`, `grwm_ootd_format` (empty = no hit); parallel to `content_type` |
 | `creator_type` | `brand` if official; else sports / lifestyle / fashion / beauty / other |
 | `creator_tier` | nano / micro / mid / macro / mega |
 | `is_sample_trending_audio` | Sample-relative frequent `music_id` |
@@ -165,7 +166,7 @@ Compute order: **`brand_styles` → `product_lines` → `product_categories`**.
 
 | Field | Empty meaning |
 |-------|---------------|
-| `brand_styles` | `[]` = unrecognized |
+| `brand_styles` | Multi-label positioning: `seed_style_map` ∪ `style_keywords` (not product SKU→style); `[]` = unrecognized |
 | `product_lines` | `[]` = unrecognized |
 | `product_categories` | Always ≥1 label; fallback `["uncategorized"]` |
 
@@ -203,14 +204,22 @@ Config: `feature_rules.yaml` → `text_embedding` (`enabled`, `model_name`, `min
 1. Assemble TikTok URL (`page_url` / `video_url` / `@user/video/{id}`)
 2. Download MP4 once with **yt-dlp** → `data/processed/frames/{video_id}/video.mp4`
 3. Extract **4 frames at 20% / 40% / 60% / 80%** of duration (OpenCV)
-4. Same frames → CLIP (`visual_embedding`) + `appearance_type`
+4. Same frames → CLIP (`visual_embedding`) + zero-shot `visual_format` / `visual_setting`
 
 | Field | Type | Notes |
 |-------|------|-------|
 | `visual_embedding` | list[float] \| null | Mean-pooled CLIP vector (L2-normalized) |
 | `visual_embedding_method` | str | `clip_visual` \| `not_embedded` |
 | `visual_embedding_model` | str \| null | e.g. `sentence-transformers/clip-ViT-B-32` |
-| `appearance_type` | str | `unknown` / `person_present` / `product_only` / `mixed` / `other` |
+| `visual_format` | CLIP zero-shot: product_closeup / on_body_styling / sports_action / talking_head / campaign_visual / archival_retro / other / unknown |
+| `visual_setting` | CLIP zero-shot: studio / outdoor / gym_training / sports_venue / event_crowd / home_indoor / retail_store / other / unknown |
+| `visual_format_score` / `visual_setting_score` | Top-1 aggregated cosine score |
+| `visual_format_margin` / `visual_setting_margin` | Top-1 − top-2 score |
+| `visual_format_second*` / `visual_setting_second*` | Runner-up label + score |
+| `visual_valid_frames` | Usable frame count (of 4) |
+| `visual_classification_status` | `ok` / `partial` / `unknown` |
+| `vf_*_score` / `vs_*_score` | Per-class video-level scores |
+| `appearance_type` | **Removed** (was detector stub → almost always `other`) |
 | `frame_paths` | list[str] | Cached `frame_000.jpg`…`frame_003.jpg` |
 
 Config (`visual_embedding`): `frame_fractions: [0.2, 0.4, 0.6, 0.8]`, `download_video: false` by default (enable with `true` or `VISUAL_DOWNLOAD=1`). Cover is only a last-resort fallback.
