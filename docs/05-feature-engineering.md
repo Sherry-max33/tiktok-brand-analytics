@@ -49,8 +49,8 @@ Derived columns:
 - `engagement_count` — unweighted sum
 - `engagement_rate` / `engagement_to_view_rate`
 - `weighted_engagement_count` / `weighted_engagement_rate`
-- `brand_relative_engagement_index` — weighted rate ÷ brand mean
-
+- `brand_relative_engagement_index` — weighted rate ÷ **brand median** WER
+  (`BRI > 1` = above that brand’s typical performance)
 ## Sentiment (`sentiment_score`) — language routing + MT
 
 **Model:** VADER (`vaderSentiment`) compound ≈ **[-1, 1]**.  
@@ -287,8 +287,9 @@ Still stub: `content_cluster_id`
 
 ## Example cuts
 
-- Brand × `product_categories` × `weighted_engagement_rate`
-- Brand × `content_type` × `brand_relative_engagement_index`
+- Brand × `content_type` × **median** `weighted_engagement_rate` (brand comparison / Theme 1 crosstabs)
+- Brand × `content_type` × `brand_relative_engagement_index` (within-brand; modeling Y)
+- Brand × `product_categories` × median `weighted_engagement_rate`
 - `post_date` × brand volume and engagement trends
 - `creator_type` × brand (official vs UGC)
 - `product_lines` × engagement (e.g. jordan, samba, tech_fleece)

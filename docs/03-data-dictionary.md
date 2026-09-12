@@ -130,7 +130,7 @@ The feature table **keeps clean columns** and **adds** derived fields below. Rul
 | `engagement_rate` | `engagement_count / view_count` (null if views ≤ 0) |
 | `weighted_engagement_count` | `0.10*like + 0.25*comment + 0.30*share + 0.35*collect` |
 | `weighted_engagement_rate` | weighted count / views |
-| `brand_relative_engagement_index` | weighted rate / brand mean weighted rate |
+| `brand_relative_engagement_index` | `weighted_engagement_rate_i / median(WER \| brand)` (“typical” = brand median; resistant to viral outliers) |
 | `like_to_view_rate` | like / views |
 | `comment_to_view_rate` | comment / views |
 | `share_to_view_rate` | share / views |

@@ -5,7 +5,7 @@ Engagement metrics:
 - engagement_count: like + comment + share + collect
 - weighted_engagement_count: 0.10*like + 0.25*comment + 0.30*share + 0.35*collect
 - weighted_engagement_rate: weighted_engagement_count / view_count
-- brand_relative_engagement_index: weighted_engagement_rate / brand mean
+- brand_relative_engagement_index: weighted_engagement_rate / brand median
 
 Taxonomy (configs/taxonomy.yaml) — feature-layer multi-label; compute order:
 - brand_styles → product_lines → product_categories (cascade; see yaml)
@@ -111,8 +111,12 @@ def add_derived_metrics(df: pd.DataFrame) -> pd.DataFrame:
     views = df["view_count"].replace(0, pd.NA)
     df["weighted_engagement_rate"] = df["weighted_engagement_count"] / views
 
-    brand_mean = df.groupby("brand", dropna=False)["weighted_engagement_rate"].transform("mean")
-    df["brand_relative_engagement_index"] = df["weighted_engagement_rate"] / brand_mean.replace(0, pd.NA)
+    brand_typical = df.groupby("brand", dropna=False)["weighted_engagement_rate"].transform(
+        "median"
+    )
+    df["brand_relative_engagement_index"] = df["weighted_engagement_rate"] / brand_typical.replace(
+        0, pd.NA
+    )
     return df
 
 
