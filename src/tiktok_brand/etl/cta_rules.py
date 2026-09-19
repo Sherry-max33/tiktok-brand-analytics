@@ -111,6 +111,19 @@ DISCOVERY_TRAFFIC_CTA_PATTERNS: List[str] = [
     r"\benter\s+(?:now|today|here|the\s+giveaway)\b",
 ]
 
+# Pure giveaway / contest cues (orthogonal to promo language and purchase CTA).
+GIVEAWAY_PATTERNS: List[str] = [
+    r"\bgiveaway\b",
+    r"\bgift\s+card\b",
+    r"\bfree\s+gift\b",
+    r"\bwin\s+a\b",
+    r"\bi'?ll\s+pick\b",
+    r"\btag\s+a\s+friend\b",
+    r"\benter\s+(?:to\s+)?win\b",
+    r"\bcontest\b",
+    r"\bsweepstakes\b",
+]
+
 PROMO_PATTERNS: List[str] = [
     r"\bon\s+sale\b",
     r"\b(?:summer|winter|holiday|flash|exclusive)\s+sale\b",
@@ -152,6 +165,7 @@ _COMPILED = {
     "engagement": _compile(ENGAGEMENT_CTA_PATTERNS),
     "discovery_traffic": _compile(DISCOVERY_TRAFFIC_CTA_PATTERNS),
     "promo": _compile(PROMO_PATTERNS),
+    "giveaway": _compile(GIVEAWAY_PATTERNS),
 }
 
 
@@ -167,10 +181,12 @@ def detect_cta_flags(caption: str) -> Dict[str, bool]:
     engagement = matches_any(text, _COMPILED["engagement"])
     discovery = matches_any(text, _COMPILED["discovery_traffic"])
     promo = matches_any(text, _COMPILED["promo"])
+    giveaway = matches_any(text, _COMPILED["giveaway"])
     return {
         "has_purchase_cta": purchase,
         "has_engagement_cta": engagement,
         "has_discovery_traffic_cta": discovery,
         "has_promo_language": promo,
+        "has_giveaway": giveaway,
         "has_cta": purchase or engagement or discovery,
     }

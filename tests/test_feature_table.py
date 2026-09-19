@@ -53,6 +53,7 @@ def test_build_feature_table():
     assert "brand_relative_engagement_index" in out.columns
     assert "has_cta" in out.columns
     assert "has_purchase_cta" in out.columns
+    assert "has_giveaway" in out.columns
     assert "has_product_link" not in out.columns
     assert "engagement_score" not in out.columns
     assert "caption_clean" in out.columns

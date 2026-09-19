@@ -11,7 +11,7 @@ Taxonomy (configs/taxonomy.yaml) — feature-layer multi-label; compute order:
 - brand_styles → product_lines → product_categories (cascade; see yaml)
 
 CTA:
-- has_purchase_cta / has_engagement_cta / has_discovery_traffic_cta / has_promo_language
+- has_purchase_cta / has_engagement_cta / has_discovery_traffic_cta / has_promo_language / has_giveaway
 - has_cta = purchase OR engagement OR discovery (promo kept separate)
 
 content_type: multi-label list from configs/feature_rules.yaml
@@ -209,6 +209,7 @@ def build_feature_table(
         "has_engagement_cta",
         "has_discovery_traffic_cta",
         "has_promo_language",
+        "has_giveaway",
         "has_cta",
     ]:
         df[col] = cta_df[col]

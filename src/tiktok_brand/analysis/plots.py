@@ -746,3 +746,289 @@ def scalable_winners_scatter(
     ax.legend(handles=handles, frameon=False, loc="lower right")
     fig.tight_layout()
     return fig
+
+
+def screening_roc_curves(
+    curves: Sequence[dict],
+    *,
+    title: str = "OOF ROC — binary Top-Q screening",
+):
+    """Plot one or more ROC curves from OOF labels/scores.
+
+    Each item in ``curves``: ``{"label": str, "y_true": array, "score": array}``.
+    """
+    from sklearn.metrics import roc_auc_score, roc_curve
+
+    plt = _require_matplotlib()
+    _apply_style(plt)
+    fig, ax = plt.subplots(figsize=(5.5, 4.5))
+    colors = ["#1a1a1a", "#c45c26", "#2a6f97", "#6b6b6b"]
+    for i, c in enumerate(curves):
+        y = np.asarray(c["y_true"]).astype(int)
+        s = np.asarray(c["score"], dtype=float)
+        mask = np.isfinite(s) & (y >= 0)
+        y, s = y[mask], s[mask]
+        fpr, tpr, _ = roc_curve(y, s)
+        auc = float(roc_auc_score(y, s))
+        ax.plot(fpr, tpr, color=colors[i % len(colors)], lw=2, label=f'{c["label"]} (AUC={auc:.3f})')
+    ax.plot([0, 1], [0, 1], color="#bbbbbb", ls="--", lw=1)
+    ax.set_xlabel("False positive rate")
+    ax.set_ylabel("True positive rate")
+    ax.set_title(title)
+    ax.legend(frameon=False, loc="lower right", fontsize=8)
+    fig.tight_layout()
+    return fig
+
+
+def screening_lift_bars(
+    rows: Sequence[dict],
+    *,
+    title: str = "Lift@K — screening models",
+    ks: Sequence[int] = (5, 10, 20),
+):
+    """Grouped bars of Lift@K.
+
+    Each row: ``{"label": str, "lift_at_5": float, "lift_at_10": float, ...}``.
+    """
+    plt = _require_matplotlib()
+    _apply_style(plt)
+    labels = [r["label"] for r in rows]
+    x = np.arange(len(labels))
+    width = 0.8 / max(len(ks), 1)
+    fig, ax = plt.subplots(figsize=(7.2, 3.8))
+    for j, k in enumerate(ks):
+        vals = [float(r.get(f"lift_at_{k}", np.nan)) for r in rows]
+        ax.bar(x + j * width, vals, width=width, label=f"Lift@{k}%")
+    ax.axhline(1.0, color="#999", ls=":", lw=1)
+    ax.set_xticks(x + width * (len(ks) - 1) / 2)
+    ax.set_xticklabels(labels, rotation=15, ha="right")
+    ax.set_ylabel("Lift vs baseline")
+    ax.set_title(title)
+    ax.legend(frameon=False, fontsize=8)
+    fig.tight_layout()
+    return fig
+
+
+def screening_shap_drivers(
+    driver_shap: pd.DataFrame,
+    *,
+    title: str = "Top drivers — mean |SHAP| by family",
+    top_n: int = 10,
+):
+    """Horizontal bars for driver-family SHAP rollup (screening interpretation)."""
+    plt = _require_matplotlib()
+    _apply_style(plt)
+    d = driver_shap.head(top_n).iloc[::-1]
+    fig, ax = plt.subplots(figsize=(7.0, max(3.2, 0.32 * len(d) + 1.2)))
+    ax.barh(d["driver_label"], d["mean_abs_shap_sum"], color="#1a1a1a")
+    ax.set_xlabel("Sum of mean |SHAP|")
+    ax.set_title(title)
+    fig.tight_layout()
+    return fig
+
+
+def screening_shap_features(
+    feature_shap: pd.DataFrame,
+    *,
+    title: str = "Top features — mean |SHAP|",
+    top_n: int = 15,
+):
+    """Horizontal bars for individual feature mean |SHAP| (PCA dims kept separate)."""
+    plt = _require_matplotlib()
+    _apply_style(plt)
+    d = feature_shap.head(top_n).iloc[::-1]
+    fig, ax = plt.subplots(figsize=(7.0, max(3.4, 0.30 * len(d) + 1.2)))
+    ax.barh(d["feature"], d["mean_abs_shap"], color="#4a4a4a")
+    ax.set_xlabel("Mean |SHAP|")
+    ax.set_title(title)
+    fig.tight_layout()
+    return fig
+
+
+def screening_shap_directions(
+    directional: pd.DataFrame,
+    *,
+    title: str = "Signed SHAP: increases vs decreases P(top)",
+    top_n: int = 16,
+    label_col: str = "level",
+):
+    """Diverging bars for signed SHAP effects (e.g. content_type levels)."""
+    plt = _require_matplotlib()
+    _apply_style(plt)
+    d = directional.head(top_n).copy()
+    d = d.sort_values("effect", ascending=True)
+    colors = ["#1a1a1a" if v >= 0 else "#8a8a8a" for v in d["effect"]]
+    labels = d[label_col].astype(str)
+    long = bool(labels.str.len().max() and labels.str.len().max() > 24)
+    fig_h = max(3.4, 0.38 * len(d) + 1.2) if long else max(3.4, 0.32 * len(d) + 1.2)
+    fig_w = 8.6 if long else 7.2
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+    ax.barh(labels, d["effect"], color=colors)
+    ax.axvline(0.0, color="#999", lw=1)
+    ax.set_xlabel("Signed SHAP effect on P(top-decile)")
+    ax.set_title(title)
+    if long:
+        ax.tick_params(axis="y", labelsize=8)
+    fig.tight_layout()
+    return fig
+
+
+def brand_commerce_stacked(
+    mix: pd.DataFrame,
+    *,
+    title: str = "Commerce Intensity by brand",
+    brand_col: str = "brand",
+):
+    """Stacked horizontal bars: brand × intensity share."""
+    plt = _require_matplotlib()
+    _apply_style(plt)
+    order = ["None", "Low", "Medium", "High"]
+    colors = {"None": "#d9d9d9", "Low": "#a6a6a6", "Medium": "#595959", "High": "#1a1a1a"}
+    brands = list(mix[brand_col].astype(str).unique())
+    fig, ax = plt.subplots(figsize=(8.0, 1.2 + 0.7 * len(brands)))
+    left = {b: 0.0 for b in brands}
+    y_pos = {b: i for i, b in enumerate(brands)}
+    for lvl in order:
+        for b in brands:
+            row = mix.loc[(mix[brand_col] == b) & (mix["commerce_intensity"].astype(str) == lvl)]
+            share = float(row["share"].iloc[0]) if len(row) else 0.0
+            ax.barh(
+                y_pos[b],
+                share,
+                left=left[b],
+                color=colors[lvl],
+                height=0.55,
+                label=lvl if b == brands[0] else None,
+            )
+            if share >= 0.06:
+                ax.text(
+                    left[b] + share / 2,
+                    y_pos[b],
+                    f"{100 * share:.0f}%",
+                    ha="center",
+                    va="center",
+                    fontsize=8,
+                    color="white" if lvl in {"Medium", "High"} else "#222",
+                )
+            left[b] += share
+    ax.set_yticks(list(y_pos.values()))
+    ax.set_yticklabels([b.title() for b in brands])
+    ax.set_xlim(0, 1)
+    ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{100 * v:.0f}%"))
+    ax.set_xlabel("Share of videos")
+    ax.set_title(title, loc="left")
+    ax.legend(frameon=False, ncol=4, loc="upper center", bbox_to_anchor=(0.5, -0.22))
+    fig.tight_layout()
+    return fig
+
+
+def commerce_engagement_line(
+    trend: pd.DataFrame,
+    *,
+    y_col: str = "median_bri",
+    title: str = "Engagement by Commerce Intensity",
+    ylabel: str = "Median BRI",
+):
+    """Trend: Commerce Intensity → engagement metric."""
+    plt = _require_matplotlib()
+    _apply_style(plt)
+    t = trend.copy()
+    t["commerce_intensity"] = t["commerce_intensity"].astype(str)
+    order = ["None", "Low", "Medium", "High"]
+    t = t.set_index("commerce_intensity").reindex(order).reset_index()
+    x = np.arange(len(order))
+    y = t[y_col].to_numpy(dtype=float)
+    fig, ax = plt.subplots(figsize=(7.2, 4.4))
+    ax.plot(x, y, "o-", color="#1a1a1a", lw=1.8, ms=8)
+    for xi, yi, n in zip(x, y, t["n"]):
+        if np.isfinite(yi):
+            ax.annotate(
+                f"n={int(n)}",
+                (xi, yi),
+                textcoords="offset points",
+                xytext=(0, 10),
+                ha="center",
+                fontsize=8,
+                color="#555",
+            )
+    ax.set_xticks(x)
+    ax.set_xticklabels(order)
+    ax.set_xlabel("Commerce Intensity")
+    ax.set_ylabel(ylabel)
+    ax.set_title(title, loc="left")
+    fig.tight_layout()
+    return fig
+
+
+def commerce_bri_bubbles(
+    bubbles: pd.DataFrame,
+    *,
+    title: str,
+    min_n: int = 20,
+    annotate: bool = True,
+    max_labels: int = 18,
+):
+    """Commerce–Engagement matrix: mean intensity (x) × median BRI (y)."""
+    plt = _require_matplotlib()
+    _apply_style(plt)
+    t = bubbles.copy()
+    x = t["mean_commerce_intensity"].to_numpy(dtype=float)
+    y = t["median_bri"].to_numpy(dtype=float)
+    n = t["n"].to_numpy(dtype=float)
+    labels = t["level"].map(humanize_label).astype(str)
+
+    fig, ax = plt.subplots(figsize=(8.6, 5.6))
+    sizes = 50 + 450 * (n / n.max()) if n.max() else n
+    colors = ["#bbbbbb" if c < min_n else "#2a2a2a" for c in n]
+    ax.scatter(x, y, s=sizes, c=colors, alpha=0.75, edgecolors="white", linewidths=0.6)
+
+    # Reference lines at sample midpoints
+    if len(x) and np.isfinite(x).any() and np.isfinite(y).any():
+        ax.axvline(float(np.nanmedian(x)), color="#ccc", lw=1, ls="--")
+        ax.axhline(float(np.nanmedian(y)), color="#ccc", lw=1, ls="--")
+
+    if annotate:
+        # Prefer largest bubbles when many levels
+        order = np.argsort(-n)
+        shown = 0
+        for i in order:
+            if shown >= max_labels:
+                break
+            lab = labels.iloc[i]
+            short = lab if len(lab) <= 26 else lab[:25] + "…"
+            ax.annotate(
+                short,
+                (x[i], y[i]),
+                textcoords="offset points",
+                xytext=(5, 4),
+                fontsize=7.5,
+                color="#111",
+            )
+            shown += 1
+
+    ax.set_xlabel("Mean Commerce Intensity (0–4 components)")
+    ax.set_ylabel("Median BRI")
+    ax.set_title(title + "\nBubble size = n; dashed lines = median split", loc="left", pad=10)
+    fig.tight_layout()
+    return fig
+
+
+def commerce_intensity_hbar(
+    tab: pd.DataFrame,
+    *,
+    title: str,
+    value_col: str = "mean_commerce_intensity",
+    top_n: int = 15,
+):
+    """Horizontal bars of mean commerce intensity by annotation level."""
+    plt = _require_matplotlib()
+    _apply_style(plt)
+    t = tab.head(top_n).iloc[::-1].copy()
+    labels = t["level"].map(humanize_label).astype(str)
+    fig_h = max(3.2, 0.34 * len(t) + 1.0)
+    fig, ax = plt.subplots(figsize=(7.6, fig_h))
+    ax.barh(labels, t[value_col], color="#2a2a2a")
+    ax.set_xlabel("Mean Commerce Intensity")
+    ax.set_title(title, loc="left")
+    fig.tight_layout()
+    return fig
