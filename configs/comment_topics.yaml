@@ -1,0 +1,570 @@
+# Comment topic taxonomy for Theme 4.
+#
+# Discovery (SBERT/NMF) ≠ final labels.
+# Comment-level lexicon. Commercial attribute > product entity.
+#
+# Layers: substantive > product_reaction > social > residual
+# Keywords expanded from residual human coding (taxonomy_residual_sample_400_coded.csv).
+
+topics:
+- id: design_aesthetics
+  label: Design & Aesthetics
+  layer: substantive
+- id: product_desire
+  label: Product Desire / Purchase Intent
+  layer: substantive
+- id: price_value
+  label: Price & Value
+  layer: substantive
+- id: fit_comfort
+  label: Fit & Comfort
+  layer: substantive
+- id: athlete_celebrity
+  label: Athlete / Celebrity
+  layer: substantive
+- id: product_model
+  label: Product / Model Discussion
+  layer: substantive
+- id: brand_comparison
+  label: Brand Comparison / Preference
+  layer: substantive
+- id: availability
+  label: Availability / Access
+  layer: substantive
+- id: quality_performance
+  label: Quality / Performance
+  layer: substantive
+- id: generic_product_reaction
+  label: Generic Product Reaction
+  layer: product_reaction
+- id: generic_positive
+  label: Generic Positive Reaction
+  layer: social
+- id: generic_negative
+  label: Generic Negative Reaction
+  layer: social
+- id: meme_chatter
+  label: Meme / Social Chatter
+  layer: social
+- id: other_unclear
+  label: Other / Unclear
+  layer: residual
+primary_priority:
+- brand_comparison
+- price_value
+- fit_comfort
+- availability
+- quality_performance
+- product_desire
+- design_aesthetics
+- athlete_celebrity
+- product_model
+- generic_product_reaction
+- generic_negative
+- generic_positive
+- meme_chatter
+- other_unclear
+seed_keywords:
+  brand_comparison:
+  - adidas better
+  - nike better
+  - prefer adidas
+  - prefer nike
+  - adidas girlie
+  - nike girlie
+  - team adidas
+  - team nike
+  - better than nike
+  - better than adidas
+  - adidas > nike
+  - nike > adidas
+  - always been an adidas
+  - always been a nike
+  - adidas is better
+  - nike is better
+  - adidas over nike
+  - nike over adidas
+  - nike clears
+  - adidas clears
+  - clears nike
+  - clears adidas
+  - rather get
+  - rather buy
+  - these over
+  - sambas over
+  - jordans over
+  - over jordans
+  - over sambas
+  - are better
+  - is better
+  - converse
+  - new balance
+  - aliexpress
+  - wales bonner
+  - or vomero
+  - copie
+  - over new balance
+  - nb 550
+  - nb 530
+  price_value:
+  - overpriced
+  - too expensive
+  - worth it
+  - not worth
+  - price
+  - expensive
+  - cheap
+  - cheaper
+  - costly
+  - money
+  - sale
+  - discount
+  - deal
+  - value
+  - afford
+  - rich
+  - how much
+  - cost
+  - $
+  - £
+  - €
+  - euro
+  - euros
+  - bucks
+  - paid
+  - paycheck
+  - take my money
+  - broke
+  - dollars
+  - affordable
+  - costs
+  - for 90
+  - make profit
+  - double what
+  - not affordable
+  - 22 dollars
+  - 90$
+  fit_comfort:
+  - true to size
+  - too small
+  - too big
+  - sizing
+  - comfortable
+  - comfort
+  - uncomfortable
+  - comfy
+  - snug
+  - wide feet
+  - narrow
+  - fit
+  - size
+  - feet
+  - socks
+  - legs
+  - hurt
+  - sore
+  - blister
+  - shin
+  - add height
+  - baggy
+  - wide or
+  - white laces
+  - lengüeta
+  - lacing
+  - same sizes
+  - come with the
+  - tongue
+  availability:
+  - sold out
+  - sold out again
+  - where to buy
+  - where can i get
+  - where can i buy
+  - where can i find
+  - where did you get
+  - where did u get
+  - where do i get
+  - where is the
+  - where are they from
+  - where from
+  - restock
+  - in stock
+  - out of stock
+  - available
+  - drop date
+  - drop
+  - link in
+  - link of
+  - link the
+  - link?
+  - link
+  - w2c
+  - cop
+  - restocked
+  - warehouse
+  - get these in
+  - in the us
+  - how to get
+  - find them
+  - have a link
+  - pls link
+  - please link
+  - where you got
+  - where's the
+  - where'd you get
+  - where’d you get
+  - woher
+  - onde acha
+  - где купить
+  - where's in
+  - where is the top
+  - where’s the top
+  - pls where
+  - where from?
+  quality_performance:
+  - falling apart
+  - cheaply made
+  - durable
+  - durability
+  - material
+  - quality
+  - performance
+  - build quality
+  - fell apart
+  - ripping
+  - wrinkle
+  - bend
+  - sole
+  - shin splints
+  - squeak
+  - ironing
+  - what paint
+  - air them out
+  - indoor soccer
+  - confiable
+  - under the tape
+  - brand of paint
+  - how long do they last
+  - quality check
+  product_desire:
+  - need these
+  - need them
+  - want these
+  - want them
+  - need a pair
+  - where can i get a pair
+  - add to cart
+  - adding to cart
+  - gotta have
+  - must have
+  - need this
+  - want this
+  - i need
+  - i want
+  - wanna buy
+  - going to buy
+  - im buying
+  - i'm buying
+  - buying these
+  - buy these
+  - get a pair
+  - need that
+  - buy
+  - bought
+  - buying
+  - quero
+  - quiero
+  - comprar
+  - compraré
+  - asking for
+  - copped
+  - need
+  - want
+  - me wants
+  - ordered them
+  - bestellt
+  - needddd
+  - needdd
+  - necessito
+  - '#necessary'
+  - im getting
+  - i'm getting
+  - i am getting
+  - eu necessito
+  design_aesthetics:
+  - colorway
+  - colourway
+  - color way
+  - what colorway
+  - what colourway
+  - aesthetic
+  - outfit
+  - outfits
+  - ootd
+  - drip
+  - clean look
+  - looks fire
+  - look fire
+  - looks good
+  - look good
+  - looks sick
+  - looks cool
+  - looks beautiful
+  - looks ugly
+  - so ugly
+  - look like
+  - looks like
+  - color
+  - colour
+  - colours
+  - colors
+  - black ones
+  - white ones
+  - blue ones
+  - dark red
+  - design
+  - style
+  - stylish
+  - fashion
+  - matching
+  - fit check
+  - tattoos
+  - tattoo
+  - jeans
+  - wearing
+  - ugly
+  - so ugly
+  - leopard print
+  - print ones
+  - orange ones
+  - orange 1
+  - shaped shoe
+  - color combo
+  - colour combo
+  - what color
+  - what colour
+  - which color
+  - which colour
+  - grey or
+  - gray or
+  - black or white
+  - red ones
+  - green ones
+  - pink ones
+  - retro look
+  - vintage look
+  - looks mad
+  - looks crazy
+  athlete_celebrity:
+  - lamine yamal
+  - lamine
+  - yamal
+  - pedri
+  - lebron
+  - lebron james
+  - messi
+  - neymar
+  - ronaldo
+  - cr7
+  - mbappe
+  - mbappé
+  - haaland
+  - vinicius
+  - vini
+  - kylian
+  - lisa
+  - bellingham
+  - jude
+  - raphinha
+  - raphina
+  - rodrygo
+  - athlete
+  - signature shoe
+  - worn by
+  - basketball player
+  - football player
+  - soccer player
+  - basketball
+  - football
+  - lil nas
+  - beckenbauer
+  - bechenbauer
+  - dembele
+  - ballon d'or
+  - ballon dor
+  - handanovic
+  - nicki nicole
+  - jennie
+  - jonathan davis
+  - tchouameni
+  - xabi
+  - peso pluma
+  - goalkeeper
+  - keeper
+  - torwart
+  - winger
+  - volley
+  - ямал
+  - vinicuis
+  - ousmane
+  - marcus rashford
+  - goalie
+  - striker
+  - midfielder
+  product_model:
+  - air force one
+  - air force
+  - airforce
+  - air for one
+  - nike tech
+  - tech fleece
+  - nike pro
+  - adidas campus
+  - adidas spezial
+  - samba
+  - sambas
+  - campus
+  - campuses
+  - spezial
+  - gazelle
+  - jordan 1
+  - jordan 4
+  - air jordan
+  - jordans
+  - jordan
+  - dunks
+  - dunk
+  - mercurial
+  - vapormax
+  - ultraboost
+  - yeezy
+  - forum
+  - superstar
+  - stan smith
+  - predators
+  - predator
+  - tracksuit
+  - track suit
+  - name of the shoes
+  - name of the shoe
+  - whats the name
+  - what's the name
+  - what name
+  - name?
+  - id?
+  - what shoes are these
+  - what are these
+  - which pair
+  - what model
+  - f50
+  - camiseta
+  - welche schuhe
+  - what track suit
+  - owner of a pair
+  - black cats
+  - af1
+  - vomero
+  - wales bonner
+  - yinzer
+  generic_product_reaction:
+  - these are fire
+  - this is fire
+  - these fire
+  - so fire
+  - clean af
+  - these are clean
+  - this is clean
+  - so clean
+  - clean
+  - fire
+  - hard
+  - these hard
+  - lowkey hard
+  - go crazy
+  - these go
+  - heat
+  - heatttt
+  - slaps
+  - bussin
+  - tuff
+  - ate
+  - eats
+  - mid
+  - trash
+  - ugly
+  - so ugly
+  - 🔥
+  - tufff
+  - tuffff
+  - these are class
+  - so ahh
+  - incroyable
+  - mataste
+  - this is tuff
+  - so tuff
+  - harddd
+  - fireee
+  - goes hard
+  - ate that
+  - serving
+  generic_positive:
+  - love this
+  - love it
+  - so beautiful
+  - beautiful
+  - gorgeous
+  - amazing
+  - awesome
+  - incredible
+  - so cute
+  - cute
+  - pretty
+  - perfect
+  - love
+  - sick
+  - dope
+  - lit
+  - yesss
+  - yes girl
+  - so good
+  - the best
+  - goat
+  - cool
+  - ❤️
+  - 🥰
+  - 😍
+  - 🤩
+  generic_negative:
+  - terrible
+  - tragedia
+  - horrible
+  - awful
+  - disgusting
+  - hate this
+  - hate it
+  - cringe
+  - stupid
+  - scary
+  meme_chatter:
+  - '[stickers]'
+  - '[sticker]'
+  - '[photo]'
+  - stickers
+  - sticker
+  - bro
+  - lol
+  - lmao
+  - lmfao
+  - meme
+  - 💀
+  - 😭
+  - fr fr
+  - no cap
+  - ong
+  - ikr
+  - haha
+  - xd
+  - what song
+  - this song
+  - who's filming
+  - who is filming

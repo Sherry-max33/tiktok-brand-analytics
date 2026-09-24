@@ -56,6 +56,7 @@ def test_add_commerce_intensity_and_trend():
         "None",
         "Medium",
     ]
+    assert float((out["commerce_intensity_score"] > 0).mean()) == 0.75
 
     trend = commerce_engagement_trend(out)
     assert list(trend["commerce_intensity"].astype(str)) == [

@@ -4,7 +4,7 @@ A reproducible, sample-based analytics pipeline comparing **Nike** and **Adidas*
 
 1. Awareness / engagement  
 2. Social commerce signals  
-3. Influencer strategy (official vs UGC)  
+3. Creator & Collaboration Strategy (official vs UGC; scale × content × BRI)  
 4. Sentiment & topics (NLP)
 
 > **Scope:** Hashtag collection is **sample-based** (ranked feeds, not a full archive). Each crawl records `crawled_at` for reproducibility.

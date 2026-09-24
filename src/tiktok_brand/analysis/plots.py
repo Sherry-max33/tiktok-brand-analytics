@@ -922,6 +922,123 @@ def brand_commerce_stacked(
     return fig
 
 
+def brand_commerce_rate_bars(
+    summary: pd.DataFrame,
+    *,
+    title: str = "Explicit commerce cue rates by brand",
+    brands: Sequence[str] = ("nike", "adidas"),
+    rate_cols: Sequence[tuple[str, str]] = (
+        ("purchase_cta_rate", "Purchase CTA"),
+        ("discovery_traffic_cta_rate", "Discovery / traffic CTA"),
+        ("promo_language_rate", "Promo language"),
+    ),
+):
+    """Grouped bars: Nike vs Adidas on key commerce component rates."""
+    plt = _require_matplotlib()
+    _apply_style(plt)
+    s = summary.copy()
+    s["brand"] = s["brand"].astype(str).str.lower()
+    brand_list = [b for b in brands if b in set(s["brand"])]
+    labels = [lab for _, lab in rate_cols]
+    cols = [c for c, _ in rate_cols]
+
+    fig, ax = plt.subplots(figsize=(7.6, 4.2))
+    x = np.arange(len(labels))
+    width = 0.36 if len(brand_list) == 2 else 0.6 / max(len(brand_list), 1)
+    for i, b in enumerate(brand_list):
+        row = s.loc[s["brand"] == b].iloc[0]
+        vals = [float(row[c]) for c in cols]
+        offset = (i - (len(brand_list) - 1) / 2) * width
+        bars = ax.bar(
+            x + offset,
+            vals,
+            width=width * 0.92,
+            color=BRAND_COLORS.get(b, "#888"),
+            label=b.title(),
+        )
+        for bar, v in zip(bars, vals):
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height() + 0.0015,
+                f"{100 * v:.1f}%",
+                ha="center",
+                va="bottom",
+                fontsize=8,
+                color="#333",
+            )
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels)
+    ax.set_ylabel("Share of brand videos")
+    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{100 * v:.0f}%"))
+    ns = ", ".join(
+        f"{b.title()} n={int(s.loc[s['brand']==b, 'n'].iloc[0]):,}" for b in brand_list
+    )
+    ax.set_title(f"{title}\n{ns}", loc="left", pad=10)
+    ax.legend(frameon=False, loc="upper right")
+    fig.tight_layout()
+    return fig
+
+
+def brand_dim_commerce_hbar(
+    wide: pd.DataFrame,
+    *,
+    title: str,
+    brands: Sequence[str] = ("nike", "adidas"),
+    small_n: int = SMALL_N,
+    top_n: int = 12,
+    value_prefix: str = "mean_",
+    n_prefix: str = "n_",
+):
+    """Side-by-side mean Commerce Intensity by annotation level (Nike vs Adidas).
+
+    Levels with either brand ``n < small_n`` are drawn faded; y labels get ``*``.
+    """
+    plt = _require_matplotlib()
+    _apply_style(plt)
+    t = wide.head(top_n).iloc[::-1].copy()
+    if t.empty:
+        fig, ax = plt.subplots(figsize=(7, 2))
+        ax.text(0.5, 0.5, "No levels above filters", ha="center")
+        ax.axis("off")
+        return fig
+
+    labels = []
+    for _, r in t.iterrows():
+        lab = humanize_label(r["level"])
+        ns = [int(r.get(f"{n_prefix}{b}", 0)) for b in brands]
+        if any(n < small_n for n in ns):
+            lab = f"{lab}*"
+        labels.append(lab)
+
+    y = np.arange(len(t))
+    height = 0.35 if len(brands) == 2 else 0.6 / max(len(brands), 1)
+    fig_h = max(3.2, 0.42 * len(t) + 1.2)
+    fig, ax = plt.subplots(figsize=(8.4, fig_h))
+
+    for i, b in enumerate(brands):
+        vals = t[f"{value_prefix}{b}"].to_numpy(dtype=float)
+        ns = t[f"{n_prefix}{b}"].to_numpy(dtype=float)
+        offset = (i - (len(brands) - 1) / 2) * height
+        base = BRAND_COLORS.get(b, "#888")
+        bars = ax.barh(y + offset, vals, height=height * 0.92, label=b.title(), color=base)
+        for bar, n in zip(bars, ns):
+            bar.set_alpha(0.35 if n < small_n else 0.9)
+
+    ax.set_yticks(y)
+    ax.set_yticklabels(labels)
+    ax.set_xlabel("Mean Commerce Intensity (0-4)")
+    ax.set_title(
+        f"{title}\nGray / * = either brand n < {small_n}",
+        loc="left",
+        pad=10,
+    )
+    ax.legend(frameon=False, loc="lower right")
+    if labels and max(len(str(c)) for c in labels) > 28:
+        fig.subplots_adjust(left=0.42)
+    fig.tight_layout()
+    return fig
+
+
 def commerce_engagement_line(
     trend: pd.DataFrame,
     *,
@@ -968,7 +1085,7 @@ def commerce_bri_bubbles(
     annotate: bool = True,
     max_labels: int = 18,
 ):
-    """Commerce–Engagement matrix: mean intensity (x) × median BRI (y)."""
+    """Commerce x Engagement matrix: mean intensity (x) x median BRI (y)."""
     plt = _require_matplotlib()
     _apply_style(plt)
     t = bubbles.copy()
@@ -1006,7 +1123,7 @@ def commerce_bri_bubbles(
             )
             shown += 1
 
-    ax.set_xlabel("Mean Commerce Intensity (0–4 components)")
+    ax.set_xlabel("Mean Commerce Intensity (0-4 components)")
     ax.set_ylabel("Median BRI")
     ax.set_title(title + "\nBubble size = n; dashed lines = median split", loc="left", pad=10)
     fig.tight_layout()
@@ -1030,5 +1147,484 @@ def commerce_intensity_hbar(
     ax.barh(labels, t[value_col], color="#2a2a2a")
     ax.set_xlabel("Mean Commerce Intensity")
     ax.set_title(title, loc="left")
+    fig.tight_layout()
+    return fig
+
+
+def brand_channel_share_bars(
+    summary: pd.DataFrame,
+    *,
+    title: str = "Official vs UGC share by brand",
+):
+    """Grouped bars: Official / UGC share for Nike vs Adidas."""
+    plt = _require_matplotlib()
+    _apply_style(plt)
+    t = summary.copy()
+    t["brand"] = t["brand"].astype(str).str.title()
+    brands = list(t["brand"])
+    x = np.arange(len(brands))
+    width = 0.35
+    fig, ax = plt.subplots(figsize=(7.2, 3.8))
+    ax.bar(x - width / 2, t["official_share"], width, label="Official", color="#2a2a2a")
+    ax.bar(x + width / 2, t["ugc_share"], width, label="UGC", color="#8a8a8a")
+    ax.set_xticks(x)
+    ax.set_xticklabels(brands)
+    ax.set_ylim(0, 1)
+    ax.set_ylabel("Share of videos")
+    ax.set_title(title, loc="left")
+    ax.legend(frameon=False)
+    fig.tight_layout()
+    return fig
+
+
+def ugc_tier_share_bars(
+    mix: pd.DataFrame,
+    *,
+    title: str = "UGC creator-tier mix by brand",
+    scopes: Sequence[str] = ("nike", "adidas"),
+):
+    """Grouped bars of UGC creator_tier share for selected brand scopes."""
+    plt = _require_matplotlib()
+    _apply_style(plt)
+    tier_order = ("nano", "micro", "mid", "macro", "mega")
+
+    t = mix.loc[mix["scope"].isin(scopes)].copy()
+    if t.empty:
+        fig, ax = plt.subplots(figsize=(7.2, 3.6))
+        ax.set_title(title, loc="left")
+        return fig
+
+    tiers = [x for x in tier_order if x in set(t["creator_tier"].astype(str))]
+    x = np.arange(len(tiers))
+    width = 0.35 if len(scopes) == 2 else 0.6 / max(len(scopes), 1)
+    fig, ax = plt.subplots(figsize=(8.0, 3.8))
+    for i, scope in enumerate(scopes):
+        sub = t.loc[t["scope"] == scope].copy()
+        sub["_tier"] = sub["creator_tier"].astype(str)
+        sub = sub.set_index("_tier")
+        vals = [float(sub.loc[tier, "share"]) if tier in sub.index else 0.0 for tier in tiers]
+        offset = (i - (len(scopes) - 1) / 2) * width
+        color = BRAND_COLORS.get(str(scope).lower(), "#888")
+        ax.bar(x + offset, vals, width * 0.92, label=str(scope).title(), color=color)
+    ax.set_xticks(x)
+    ax.set_xticklabels([str(x).title() for x in tiers])
+    ax.set_ylabel("Share of UGC authors")
+    ax.set_title(title, loc="left")
+    ax.legend(frameon=False)
+    fig.tight_layout()
+    return fig
+
+
+def scale_content_bri_heatmap(
+    wide: pd.DataFrame,
+    *,
+    title: str,
+    n_counts: Optional[pd.DataFrame] = None,
+):
+    """Heatmap of median BRI for creator scale × content dimension."""
+    plt = _require_matplotlib()
+    _apply_style(plt)
+    if wide is None or wide.empty:
+        fig, ax = plt.subplots(figsize=(6, 3))
+        ax.set_title(title, loc="left")
+        ax.text(0.5, 0.5, "No cells meet min_count", ha="center", va="center")
+        ax.axis("off")
+        return fig
+
+    mat = wide.copy()
+    mat.columns = [humanize_label(c) for c in mat.columns]
+    mat.index = [str(i).title() if not str(i).startswith("Q") else str(i) for i in mat.index]
+    fig_w = max(7.0, 0.9 * mat.shape[1] + 2.5)
+    fig_h = max(3.2, 0.55 * mat.shape[0] + 1.4)
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+    im = ax.imshow(mat.to_numpy(dtype=float), aspect="auto", cmap="RdYlGn", vmin=0.5, vmax=1.5)
+    ax.set_xticks(np.arange(mat.shape[1]))
+    ax.set_yticks(np.arange(mat.shape[0]))
+    ax.set_xticklabels(list(mat.columns), rotation=35, ha="right")
+    ax.set_yticklabels(list(mat.index))
+    ax.set_title(title, loc="left")
+    for i in range(mat.shape[0]):
+        for j in range(mat.shape[1]):
+            val = mat.iloc[i, j]
+            if pd.isna(val):
+                txt = ""
+            else:
+                n_txt = ""
+                if n_counts is not None:
+                    # n_counts may use raw level names
+                    try:
+                        raw_col = wide.columns[j]
+                        raw_idx = wide.index[i]
+                        n_val = n_counts.loc[raw_idx, raw_col]
+                        if pd.notna(n_val):
+                            n_txt = f"\nn={int(n_val)}"
+                    except Exception:
+                        n_txt = ""
+                txt = f"{val:.2f}{n_txt}"
+            ax.text(j, i, txt, ha="center", va="center", fontsize=8, color="#111")
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="Median BRI")
+    fig.tight_layout()
+    return fig
+
+
+# ---------------------------------------------------------------------------
+# Theme 4 — Sentiment & Topics presentation charts
+# ---------------------------------------------------------------------------
+
+
+def sentiment_stacked_bars(
+    summary: pd.DataFrame,
+    *,
+    title: str = "Overall comment sentiment by brand",
+    brand_col: str = "brand",
+    brands: Sequence[str] = ("nike", "adidas"),
+):
+    """100% stacked Neg | Neu | Pos bars (prefer shares over median~0)."""
+    plt = _require_matplotlib()
+    _apply_style(plt)
+    s = summary.copy()
+    s[brand_col] = s[brand_col].astype(str).str.lower()
+    order = [b for b in brands if b in set(s[brand_col])]
+    parts = [
+        ("share_negative", "Negative", "#bdbdbd"),
+        ("share_neutral", "Neutral", "#e0e0e0"),
+        ("share_positive", "Positive", "#424242"),
+    ]
+    fig, ax = plt.subplots(figsize=(7.2, 1.1 + 0.7 * len(order)))
+    y_pos = {b: i for i, b in enumerate(order)}
+    left = {b: 0.0 for b in order}
+    for col, lab, color in parts:
+        for b in order:
+            row = s.loc[s[brand_col] == b].iloc[0]
+            share = float(row[col])
+            ax.barh(
+                y_pos[b],
+                share,
+                left=left[b],
+                color=color,
+                height=0.55,
+                label=lab if b == order[0] else None,
+            )
+            if share >= 0.08:
+                ax.text(
+                    left[b] + share / 2,
+                    y_pos[b],
+                    f"{100 * share:.0f}%",
+                    ha="center",
+                    va="center",
+                    fontsize=8,
+                    color="#111" if lab != "Positive" else "#fff",
+                )
+            left[b] += share
+    ax.set_yticks(list(y_pos.values()))
+    labels = []
+    for b in order:
+        row = s.loc[s[brand_col] == b].iloc[0]
+        labels.append(f"{b.title()}  (n={int(row['n_comments']):,} comments)")
+    ax.set_yticklabels(labels)
+    ax.set_xlim(0, 1)
+    ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{100 * v:.0f}%"))
+    ax.set_xlabel("Share of scored comments")
+    ax.set_title(title, loc="left")
+    ax.legend(frameon=False, ncol=3, loc="upper center", bbox_to_anchor=(0.5, -0.22))
+    fig.tight_layout()
+    return fig
+
+
+def content_type_sentiment_dumbbell(
+    tab: pd.DataFrame,
+    *,
+    metric: str = "share_positive",
+    title: str = "Positive sentiment by content type",
+    brands: Sequence[str] = ("nike", "adidas"),
+    min_count: int = 30,
+    annotate_single_brand: bool = True,
+    fade_single_brand: bool = True,
+):
+    """Dumbbell / dot plot: content type × brand on one sentiment share.
+
+    ``metric`` may be ``share_positive``, ``share_negative``, or ``net``
+    (positive − negative). Types with only one brand are still shown (single
+    faded dot) — do not read them as cross-brand wins.
+    """
+    plt = _require_matplotlib()
+    _apply_style(plt)
+    work = tab.loc[tab["n"] >= min_count].copy()
+    work["brand"] = work["brand"].astype(str).str.lower()
+    is_net = metric == "net"
+    if is_net:
+        if "net" not in work.columns:
+            work["net"] = work["share_positive"] - work["share_negative"]
+        value_col = "net"
+    else:
+        value_col = metric
+
+    # Sort: comparable (both brands) above single-brand supporting rows
+    both_levels = []
+    single_levels = []
+    for level, g in work.groupby("level"):
+        have = {str(x).lower() for x in g["brand"]}
+        if len(have & {str(b).lower() for b in brands}) >= 2:
+            both_levels.append(level)
+        else:
+            single_levels.append(level)
+    both_levels = sorted(both_levels, key=lambda lv: work.loc[work["level"] == lv, "n"].sum())
+    single_levels = sorted(single_levels, key=lambda lv: work.loc[work["level"] == lv, "n"].sum())
+    levels = single_levels + both_levels  # single-brand at bottom (supporting)
+
+    fig, ax = plt.subplots(figsize=(7.6, 1.0 + 0.45 * max(len(levels), 1)))
+    xs_all = []
+    for i, level in enumerate(levels):
+        sub = work.loc[work["level"] == level]
+        pts = []
+        for b in brands:
+            row = sub.loc[sub["brand"] == b]
+            if len(row) == 0:
+                continue
+            x = float(row[value_col].iloc[0])
+            n = int(row["n"].iloc[0])
+            pts.append((b, x, n))
+            xs_all.append(x)
+        comparable = len(pts) == 2
+        for j, (b, x, n) in enumerate(pts):
+            color = BRAND_COLORS.get(b, "#888")
+            alpha = 1.0 if comparable or not fade_single_brand else 0.35
+            size = 55 if comparable else 36
+            show_label = comparable and level == (both_levels[0] if both_levels else None)
+            ax.scatter(
+                x,
+                i,
+                s=size,
+                color=color,
+                alpha=alpha,
+                zorder=3,
+                label=b.title() if show_label else None,
+            )
+            ax.text(
+                x,
+                i + 0.18,
+                f"{100 * x:+.0f}" if is_net else f"{100 * x:.0f}%",
+                ha="center",
+                va="bottom",
+                fontsize=7 if comparable else 6.5,
+                color="#333" if comparable else "#999",
+            )
+        if comparable:
+            xa, xb = pts[0][1], pts[1][1]
+            ax.plot([xa, xb], [i, i], color="#bbb", lw=1.4, zorder=1)
+            gap = xb - xa  # brands[1] − brands[0]; same convention as topic gap
+            if abs(gap) >= 0.005:
+                lead = brands[1] if gap > 0 else brands[0]
+                tag = " neg" if "negative" in metric else (" net" if is_net else "")
+                ax.text(
+                    max(xa, xb) + 0.02,
+                    i,
+                    f"+{100 * abs(gap):.1f} {str(lead).title()}{tag}",
+                    va="center",
+                    fontsize=7.5,
+                    color="#333",
+                )
+        elif len(pts) == 1 and annotate_single_brand:
+            ax.text(
+                0.01,
+                i - 0.22,
+                f"{pts[0][0].title()} only",
+                transform=ax.get_yaxis_transform(),
+                fontsize=6.5,
+                color="#aaa",
+                ha="left",
+                va="top",
+            )
+
+    ax.set_yticks(range(len(levels)))
+    ylabels = []
+    for x in levels:
+        lab = humanize_label(str(x))
+        if x in single_levels:
+            lab = f"{lab}  (one brand)"
+        ylabels.append(lab)
+    ax.set_yticklabels(ylabels, color="#222")
+    for tick, level in zip(ax.get_yticklabels(), levels):
+        if level in single_levels:
+            tick.set_color("#999")
+    if is_net:
+        lo = min(xs_all) if xs_all else -0.2
+        hi = max(xs_all) if xs_all else 0.4
+        pad = max(0.08, 0.15 * (hi - lo + 1e-9))
+        ax.set_xlim(lo - pad, hi + pad + 0.12)
+        ax.axvline(0, color="#ddd", lw=1, zorder=0)
+        ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{100 * v:+.0f}"))
+        ax.set_xlabel("Net sentiment (pos − neg, scored comments)")
+    else:
+        xmax = float(work[value_col].max()) if len(work) else 0.5
+        ax.set_xlim(0, max(0.55, xmax + 0.18))
+        ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{100 * v:.0f}%"))
+        ax.set_xlabel(
+            "Negative share" if "negative" in metric else "Positive share"
+        )
+    ax.set_title(title, loc="left")
+    handles, labels = ax.get_legend_handles_labels()
+    if handles:
+        seen = {}
+        for h, lab in zip(handles, labels):
+            if lab:
+                seen[lab] = h
+        if seen:
+            ax.legend(seen.values(), seen.keys(), frameon=False, loc="lower right")
+    fig.tight_layout()
+    return fig
+
+
+def topic_volume_hbar(
+    vol: pd.DataFrame,
+    *,
+    title: str = "What people talk about",
+    residual_substr: Sequence[str] = ("Other", "Unclear", "Generic", "Meme", "Social"),
+    top_n: int = 12,
+    xlabel: str = "Share within group",
+):
+    """Horizontal topic share bars; soft-grey residual / social buckets last."""
+    plt = _require_matplotlib()
+    _apply_style(plt)
+    work = vol.copy().head(top_n)
+    is_soft = work["topic"].astype(str).map(
+        lambda t: any(s.lower() in t.lower() for s in residual_substr)
+    )
+    hard = work.loc[~is_soft].sort_values("share", ascending=True)
+    soft = work.loc[is_soft].sort_values("share", ascending=True)
+    plot_df = pd.concat([soft, hard], ignore_index=True)
+
+    fig, ax = plt.subplots(figsize=(7.4, 1.0 + 0.38 * max(len(plot_df), 1)))
+    colors = ["#cfcfcf" if any(s.lower() in t.lower() for s in residual_substr) else "#444444" for t in plot_df["topic"]]
+    ax.barh(plot_df["topic"], plot_df["share"], color=colors, height=0.62)
+    for y, share, n in zip(range(len(plot_df)), plot_df["share"], plot_df["n"]):
+        ax.text(share + 0.005, y, f"{100 * share:.1f}%  (n={int(n):,} comments)", va="center", fontsize=8, color="#333")
+    ax.set_xlim(0, float(plot_df["share"].max()) * 1.35 + 0.02)
+    ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{100 * v:.0f}%"))
+    ax.set_xlabel(xlabel)
+    ax.set_title(title, loc="left")
+    fig.tight_layout()
+    return fig
+
+
+def topic_brand_composition_bars(
+    vol: pd.DataFrame,
+    *,
+    title: str = "Brand composition by topic",
+    brands: Sequence[str] = ("nike", "adidas"),
+    min_n: int = 40,
+    top_n: int = 10,
+):
+    """Stacked Nike | Adidas share within each topic."""
+    plt = _require_matplotlib()
+    _apply_style(plt)
+    work = vol.loc[vol["n"] >= min_n].head(top_n).copy().iloc[::-1]
+    if work.empty:
+        fig, ax = plt.subplots(figsize=(6, 2))
+        ax.text(0.5, 0.5, "No topics above min_n", ha="center", va="center")
+        ax.axis("off")
+        return fig
+
+    fig, ax = plt.subplots(figsize=(7.4, 1.0 + 0.4 * len(work)))
+    left = np.zeros(len(work))
+    y = np.arange(len(work))
+    for b in brands:
+        col = f"{b}_share"
+        vals = work[col].astype(float).fillna(0).to_numpy()
+        ax.barh(y, vals, left=left, color=BRAND_COLORS.get(b, "#888"), height=0.58, label=b.title())
+        for i, (v, l0) in enumerate(zip(vals, left)):
+            if v >= 0.12:
+                ax.text(l0 + v / 2, i, f"{100 * v:.0f}%", ha="center", va="center", fontsize=7.5, color="#fff")
+        left = left + vals
+    ax.set_yticks(y)
+    ax.set_yticklabels(work["topic"])
+    ax.set_xlim(0, 1)
+    ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{100 * v:.0f}%"))
+    ax.set_xlabel("Share within topic")
+    ax.set_title(title, loc="left")
+    ax.legend(frameon=False, loc="lower right")
+    fig.tight_layout()
+    return fig
+
+
+def topic_sentiment_gap_dumbbell(
+    gap: pd.DataFrame,
+    *,
+    title: str = "Positive share by topic (Nike vs Adidas)",
+    brands: Sequence[str] = ("nike", "adidas"),
+    metric: str = "share_positive",
+    min_brand_n: int = 25,
+):
+    """Dumbbell: topic sentiment share gap between brands (positive, negative, or net)."""
+    plt = _require_matplotlib()
+    _apply_style(plt)
+    a, b = brands
+    is_net = metric == "net"
+    ca, cb = (f"{a}_net", f"{b}_net") if is_net else (f"{a}_{metric}", f"{b}_{metric}")
+    if ca not in gap.columns or cb not in gap.columns:
+        raise KeyError(f"gap table missing {ca}/{cb}; rebuild with topic_sentiment_gap(metric=...)")
+    work = gap.copy()
+    if is_net and "gap" not in work.columns and "net_gap" in work.columns:
+        work["gap"] = work["net_gap"]
+    elif is_net and "net_gap" in work.columns:
+        # Prefer net_gap when plotting net; keep lead_brand consistent
+        work["gap"] = work["net_gap"]
+        work["lead_brand"] = np.where(
+            work["gap"].isna(),
+            None,
+            np.where(work["gap"] > 0, b, np.where(work["gap"] < 0, a, "tie")),
+        )
+    work = work.loc[
+        (work[f"{a}_n"] >= min_brand_n) & (work[f"{b}_n"] >= min_brand_n)
+    ].sort_values("gap", ascending=True)
+    if work.empty:
+        fig, ax = plt.subplots(figsize=(6, 2))
+        ax.text(0.5, 0.5, "No topics with both brands above min_n", ha="center", va="center")
+        ax.axis("off")
+        return fig
+
+    is_neg = "negative" in metric
+    fig, ax = plt.subplots(figsize=(7.8, 1.0 + 0.42 * len(work)))
+    xs_all = []
+    for i, (_, row) in enumerate(work.iterrows()):
+        xa, xb = float(row[ca]), float(row[cb])
+        xs_all.extend([xa, xb])
+        ax.plot([xa, xb], [i, i], color="#bbb", lw=1.5, zorder=1)
+        ax.scatter(xa, i, s=55, color=BRAND_COLORS.get(a, "#fa5400"), zorder=3)
+        ax.scatter(xb, i, s=55, color=BRAND_COLORS.get(b, "#1a1a1a"), zorder=3)
+        fmt = (lambda v: f"{100 * v:+.0f}") if is_net else (lambda v: f"{100 * v:.0f}%")
+        ax.text(xa, i + 0.2, fmt(xa), ha="center", fontsize=7, color="#555")
+        ax.text(xb, i + 0.2, fmt(xb), ha="center", fontsize=7, color="#555")
+        lead = row.get("lead_brand") or row.get("warmer_brand")
+        if lead and lead != "tie":
+            tag = " neg" if is_neg else (" net" if is_net else "")
+            ax.text(
+                max(xa, xb) + 0.02,
+                i,
+                f"+{100 * abs(float(row['gap'])):.1f} {str(lead).title()}{tag}",
+                va="center",
+                fontsize=7.5,
+                color="#333",
+            )
+
+    ax.set_yticks(range(len(work)))
+    ax.set_yticklabels(work["topic"])
+    if is_net:
+        lo, hi = min(xs_all), max(xs_all)
+        pad = max(0.08, 0.15 * (hi - lo + 1e-9))
+        ax.set_xlim(lo - pad, hi + pad + 0.12)
+        ax.axvline(0, color="#ddd", lw=1, zorder=0)
+        ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{100 * v:+.0f}"))
+        ax.set_xlabel("Net sentiment (pos − neg, scored comments)")
+    else:
+        ax.set_xlim(0, max(0.6, float(work[[ca, cb]].max().max()) + 0.18))
+        ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{100 * v:.0f}%"))
+        ax.set_xlabel(
+            "Negative share (scored comments)" if is_neg else "Positive share (scored comments)"
+        )
+    ax.set_title(title, loc="left")
+    ax.scatter([], [], color=BRAND_COLORS.get(a, "#fa5400"), label=a.title())
+    ax.scatter([], [], color=BRAND_COLORS.get(b, "#1a1a1a"), label=b.title())
+    ax.legend(frameon=False, loc="lower right")
     fig.tight_layout()
     return fig

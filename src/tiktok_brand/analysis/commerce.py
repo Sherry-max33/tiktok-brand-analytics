@@ -1,4 +1,4 @@
-"""Theme 2: Social Commerce Signals.
+"""Theme 2: Commerce Orientation & Social Commerce Signals.
 
 Core variable
 -------------
@@ -173,6 +173,7 @@ def brand_commerce_summary(
             "brand": b,
             "n": int(len(sub)),
             "mean_commerce_intensity": float(sub["commerce_intensity_score"].mean()),
+            "any_commerce_share": float((sub["commerce_intensity_score"] > 0).mean()),
             "high_commerce_share": float((sub["commerce_intensity"].astype(str) == "High").mean()),
         }
         for c in COMMERCE_COMPONENTS:
@@ -283,3 +284,56 @@ def brand_driver_commerce(
     if not frames:
         return pd.DataFrame()
     return pd.concat(frames, ignore_index=True)
+
+
+def brand_dim_commerce_wide(
+    df: pd.DataFrame,
+    label: str,
+    *,
+    brands: Sequence[str] = ("nike", "adidas"),
+    min_count: int = 15,
+    min_signal: float = 0.0,
+    require_both_brands: bool = False,
+) -> pd.DataFrame:
+    """Wide Nike/Adidas mean intensity by level for grouped hbars.
+
+    Keeps levels where at least one brand has ``n >= min_count`` and
+    ``mean_commerce_intensity > min_signal`` (or either brand does).
+    """
+    long = brand_driver_commerce(df, label, brands=brands, min_count=1)
+    if long.empty:
+        return long
+
+    rows = []
+    for level, g in long.groupby("level", dropna=False):
+        by_b = {str(r["brand"]).lower(): r for _, r in g.iterrows()}
+        keep = False
+        for b in brands:
+            r = by_b.get(b)
+            if r is None:
+                continue
+            if int(r["n"]) >= min_count and float(r["mean_commerce_intensity"]) > min_signal:
+                keep = True
+        if require_both_brands:
+            keep = all(
+                b in by_b and int(by_b[b]["n"]) >= min_count for b in brands
+            ) and keep
+        if not keep:
+            continue
+        row = {"level": level}
+        for b in brands:
+            r = by_b.get(b)
+            row[f"n_{b}"] = int(r["n"]) if r is not None else 0
+            row[f"mean_{b}"] = (
+                float(r["mean_commerce_intensity"]) if r is not None else np.nan
+            )
+        means = [row[f"mean_{b}"] for b in brands if np.isfinite(row.get(f"mean_{b}", np.nan))]
+        row["max_mean"] = float(np.nanmax(means)) if means else 0.0
+        if len(brands) >= 2:
+            a, b0 = brands[0], brands[1]
+            row["gap"] = float(row.get(f"mean_{a}", np.nan) - row.get(f"mean_{b0}", np.nan))
+        rows.append(row)
+    out = pd.DataFrame(rows)
+    if out.empty:
+        return out
+    return out.sort_values("max_mean", ascending=False).reset_index(drop=True)
