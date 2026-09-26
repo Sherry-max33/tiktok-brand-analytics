@@ -1331,6 +1331,89 @@ def sentiment_stacked_bars(
     return fig
 
 
+def product_line_sentiment_compact(
+    tab: pd.DataFrame,
+    *,
+    title: str = "Product-line sentiment (diagnostic)",
+    min_count: int = 80,
+    max_per_brand: int = 5,
+    brands: Sequence[str] = ("nike", "adidas"),
+    always_include: Sequence[str] = (),
+):
+    """Compact net-sentiment bars for brand-specific product lines.
+
+    Annotates n, positive%, negative%, and net. Lines are brand-owned
+    (not cross-brand comparable on the same SKU name).
+    """
+    plt = _require_matplotlib()
+    _apply_style(plt)
+    keep = {str(x).lower() for x in always_include}
+    work = tab.loc[
+        (tab["n"] >= min_count) | (tab["level"].astype(str).str.lower().isin(keep))
+    ].copy()
+    if work.empty:
+        fig, ax = plt.subplots(figsize=(6, 2))
+        ax.text(0.5, 0.5, "No product lines above min_n", ha="center", va="center")
+        ax.axis("off")
+        return fig
+    work["brand"] = work["brand"].astype(str).str.lower()
+    if "net" not in work.columns:
+        work["net"] = work["share_positive"] - work["share_negative"]
+    work["label"] = work.apply(
+        lambda r: f"{str(r['brand']).title()} · {humanize_label(r['level'])}",
+        axis=1,
+    )
+    # Top-n by volume within brand, then force-include diagnostic lines
+    parts = []
+    for b in brands:
+        sub = work.loc[work["brand"] == b]
+        top = sub.sort_values("n", ascending=False).head(max_per_brand)
+        forced = sub.loc[sub["level"].astype(str).str.lower().isin(keep)]
+        parts.append(pd.concat([top, forced], ignore_index=True).drop_duplicates(subset=["level", "brand"]))
+    plot_df = pd.concat(parts, ignore_index=True)
+    blocks = []
+    for b in brands:
+        blocks.append(plot_df.loc[plot_df["brand"] == b].sort_values("net", ascending=True))
+    plot_df = pd.concat(blocks, ignore_index=True)
+
+    fig, ax = plt.subplots(figsize=(8.2, 1.0 + 0.42 * max(len(plot_df), 1)))
+    y = np.arange(len(plot_df))
+    colors = [BRAND_COLORS.get(b, "#888") for b in plot_df["brand"]]
+    ax.barh(y, plot_df["net"], color=colors, height=0.62, alpha=0.9)
+    ax.axvline(0, color="#ddd", lw=1, zorder=0)
+    ax.set_yticks(y)
+    ax.set_yticklabels(plot_df["label"])
+    for i, (_, row) in enumerate(plot_df.iterrows()):
+        net = float(row["net"])
+        annot = (
+            f"{100 * net:+.1f} net   "
+            f"pos {100 * float(row['share_positive']):.0f}%  "
+            f"neg {100 * float(row['share_negative']):.0f}%   "
+            f"n={int(row['n']):,}"
+        )
+        # Always place labels to the right of the bar tip (or of 0 if net < 0)
+        x_text = max(net, 0.0) + 0.02
+        ax.text(x_text, i, annot, va="center", ha="left", fontsize=7, color="#333")
+    lo = min(0.0, float(plot_df["net"].min()))
+    hi = float(plot_df["net"].max())
+    ax.set_xlim(lo - 0.06, hi + 0.42)
+    ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{100 * v:+.0f}"))
+    ax.set_xlabel("Net sentiment (pos − neg, scored comments on labeled videos)")
+    ax.set_title(title, loc="left")
+    from matplotlib.patches import Patch
+
+    ax.legend(
+        handles=[
+            Patch(facecolor=BRAND_COLORS.get(b, "#888"), edgecolor="none", label=b.title())
+            for b in brands
+        ],
+        frameon=False,
+        loc="lower right",
+    )
+    fig.tight_layout()
+    return fig
+
+
 def content_type_sentiment_dumbbell(
     tab: pd.DataFrame,
     *,
@@ -1482,23 +1565,44 @@ def topic_volume_hbar(
     residual_substr: Sequence[str] = ("Other", "Unclear", "Generic", "Meme", "Social"),
     top_n: int = 12,
     xlabel: str = "Share within group",
+    preserve_order: bool = False,
 ):
-    """Horizontal topic share bars; soft-grey residual / social buckets last."""
+    """Horizontal topic share bars; soft-grey residual / social buckets last.
+
+    If ``preserve_order`` is True, keep the input row order (e.g. taxonomy overview).
+    """
     plt = _require_matplotlib()
     _apply_style(plt)
     work = vol.copy().head(top_n)
-    is_soft = work["topic"].astype(str).map(
-        lambda t: any(s.lower() in t.lower() for s in residual_substr)
-    )
-    hard = work.loc[~is_soft].sort_values("share", ascending=True)
-    soft = work.loc[is_soft].sort_values("share", ascending=True)
-    plot_df = pd.concat([soft, hard], ignore_index=True)
+    if preserve_order:
+        plot_df = work.reset_index(drop=True)
+    else:
+        is_soft = work["topic"].astype(str).map(
+            lambda t: any(s.lower() in t.lower() for s in residual_substr)
+        )
+        hard = work.loc[~is_soft].sort_values("share", ascending=True)
+        soft = work.loc[is_soft].sort_values("share", ascending=True)
+        plot_df = pd.concat([soft, hard], ignore_index=True)
 
     fig, ax = plt.subplots(figsize=(7.4, 1.0 + 0.38 * max(len(plot_df), 1)))
-    colors = ["#cfcfcf" if any(s.lower() in t.lower() for s in residual_substr) else "#444444" for t in plot_df["topic"]]
+    colors = [
+        "#cfcfcf" if any(s.lower() in t.lower() for s in residual_substr) else "#444444"
+        for t in plot_df["topic"]
+    ]
+    # plot bottom→top as listed when preserve_order (reverse so first row is at top)
+    if preserve_order:
+        plot_df = plot_df.iloc[::-1].reset_index(drop=True)
+        colors = list(reversed(colors))
     ax.barh(plot_df["topic"], plot_df["share"], color=colors, height=0.62)
     for y, share, n in zip(range(len(plot_df)), plot_df["share"], plot_df["n"]):
-        ax.text(share + 0.005, y, f"{100 * share:.1f}%  (n={int(n):,} comments)", va="center", fontsize=8, color="#333")
+        ax.text(
+            share + 0.005,
+            y,
+            f"{100 * share:.1f}%  (n={int(n):,} comments)",
+            va="center",
+            fontsize=8,
+            color="#333",
+        )
     ax.set_xlim(0, float(plot_df["share"].max()) * 1.35 + 0.02)
     ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{100 * v:.0f}%"))
     ax.set_xlabel(xlabel)

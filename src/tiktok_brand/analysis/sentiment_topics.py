@@ -301,6 +301,94 @@ def content_cluster_sentiment(
     )
 
 
+def product_line_sentiment(
+    comments: pd.DataFrame,
+    videos: pd.DataFrame,
+    *,
+    brand_col: str = "brand",
+    min_count: int = 80,
+    score_col: str = "sentiment_score",
+    always_include: Optional[Sequence[str]] = None,
+) -> pd.DataFrame:
+    """Diagnostic drill-down: product_lines × brand × comment sentiment.
+
+    Product lines are brand-specific in this sample (no cross-brand cells).
+    ``always_include`` keeps named lines even below ``min_count`` (e.g. gazelle).
+    """
+    out = video_label_sentiment(
+        comments,
+        videos,
+        "product_lines",
+        brand_col=brand_col,
+        min_count=1,
+        score_col=score_col,
+    )
+    if out.empty:
+        return out
+    out = out.copy()
+    out["net"] = out["share_positive"] - out["share_negative"]
+    keep = set(str(x).lower() for x in (always_include or []))
+    mask = (out["n"] >= min_count) | (out["level"].astype(str).str.lower().isin(keep))
+    return out.loc[mask].reset_index(drop=True)
+
+
+def product_line_topic_sentiment(
+    comments: pd.DataFrame,
+    videos: pd.DataFrame,
+    *,
+    brand: str,
+    topic_id: str,
+    topic_col: str = "comment_topic",
+    brand_col: str = "brand",
+    min_count: int = 5,
+    always_include: Optional[Sequence[str]] = None,
+) -> pd.DataFrame:
+    """Within one brand: comment topic × product_line polarity (diagnostic)."""
+    work = scored_comments(comments)
+    if topic_col not in work.columns:
+        raise KeyError(f"Missing {topic_col}")
+    work = work.loc[
+        (work[brand_col].astype(str).str.lower() == str(brand).lower())
+        & (work[topic_col].astype(str) == topic_id)
+    ].copy()
+    if work.empty or "video_id" not in videos.columns:
+        return pd.DataFrame(
+            columns=["product_line", "n", "share_positive", "share_negative", "net"]
+        )
+    v = videos[["video_id", "product_lines"]].drop_duplicates("video_id")
+    merged = work.merge(v, on="video_id", how="inner")
+    from .data import explode_list_col
+
+    merged = explode_list_col(merged, "product_lines")
+    if merged.empty:
+        return pd.DataFrame(
+            columns=["product_line", "n", "share_positive", "share_negative", "net"]
+        )
+    rows = []
+    keep = {str(x).lower() for x in (always_include or [])}
+    for line, g in merged.groupby("product_lines", dropna=False):
+        n = len(g)
+        if n < min_count and str(line).lower() not in keep:
+            continue
+        pos = float((g["sentiment_polarity"].astype(str) == "positive").mean())
+        neg = float((g["sentiment_polarity"].astype(str) == "negative").mean())
+        rows.append(
+            {
+                "product_line": line,
+                "n": n,
+                "share_positive": pos,
+                "share_negative": neg,
+                "net": pos - neg,
+            }
+        )
+    out = pd.DataFrame(rows).sort_values("n", ascending=False).reset_index(drop=True)
+    out.attrs["brand"] = brand
+    out.attrs["topic_id"] = topic_id
+    out.attrs["n_topic_comments"] = len(work)
+    out.attrs["n_with_product_line"] = len(merged)
+    return out
+
+
 def content_types_both_brands(
     tab: pd.DataFrame,
     *,
@@ -561,6 +649,54 @@ def topic_volume_by_brand(
     out.attrs["total_topic_rows"] = total
     out.attrs["n_input_comments"] = len(comments)
     return out.reset_index(drop=True)
+
+
+LAYER_DISPLAY_LABELS = {
+    "substantive": "Substantive Topics",
+    "product_reaction": "Generic Product Reaction",
+    "social": "Social Reaction",
+    "residual": "Other / Unclear",
+}
+
+
+def topic_layer_volume(
+    comments: pd.DataFrame,
+    *,
+    layer_col: str = "topic_layer",
+    layer_order: Sequence[str] = ("substantive", "product_reaction", "social", "residual"),
+    labels: Optional[Dict[str, str]] = None,
+) -> pd.DataFrame:
+    """§3 overview: layer mix with denominator = all comments."""
+    if layer_col not in comments.columns:
+        raise KeyError(f"Missing {layer_col}; run lexicon classification first")
+    labels = labels or LAYER_DISPLAY_LABELS
+    total = len(comments)
+    counts = comments[layer_col].astype(str).value_counts()
+    rows = []
+    for layer in layer_order:
+        n = int(counts.get(layer, 0))
+        rows.append(
+            {
+                "topic": labels.get(layer, layer),
+                "layer": layer,
+                "n": n,
+                "share": n / total if total else np.nan,
+            }
+        )
+    # any unexpected layers
+    for layer, n in counts.items():
+        if layer not in layer_order:
+            rows.append(
+                {
+                    "topic": labels.get(layer, str(layer)),
+                    "layer": str(layer),
+                    "n": int(n),
+                    "share": int(n) / total if total else np.nan,
+                }
+            )
+    out = pd.DataFrame(rows)
+    out.attrs["n_input_comments"] = total
+    return out
 
 
 def topic_sentiment_by_brand(
