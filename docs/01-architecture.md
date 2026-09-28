@@ -9,7 +9,7 @@ Sample-based analytics comparing **Nike** and **Adidas** TikTok content across:
 3. Influencer strategy (official vs UGC)
 4. Sentiment & topics (NLP; embeddings partially placeholder)
 
-Hashtag feeds are ranked streams, not a complete archive. Each run records `crawled_at` for reproducibility.
+Videos come from TikTok search results for brand/product seed terms plus official account pages. Search results are algorithmically ranked, not a complete archive. Each run records `crawled_at` for reproducibility.
 
 ## Medallion layout
 
@@ -31,7 +31,7 @@ processed/feature/ Gold   — analysis / modeling features
 ## Pipeline flow
 
 ```
-Hashtag seeds + official accounts
+Seed search terms + official accounts
         │
         ▼
   Apify actors ──► crawl_exports (optional CSV)
@@ -81,7 +81,7 @@ Hashtag seeds + official accounts
 
 | Concern | Config |
 |---------|--------|
-| Seed hashtags + alias normalize | `hashtags.yaml` |
+| Seed search terms + alias normalize | `hashtags.yaml` |
 | Official usernames | `accounts.yaml` |
 | Sample sizes, paths, actors | `project.yaml` |
 | Style / line / category maps | `taxonomy.yaml` |

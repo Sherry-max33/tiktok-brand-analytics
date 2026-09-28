@@ -4,14 +4,16 @@ Operators and field mapping for video (and comment) collection.
 
 ## Sources
 
-1. **Hashtag crawl** — `source_type = "hashtag"`, `source_query = <seed tag>`
+1. **Search crawl** — TikTok search results (video tab) for each seed term, via Apify `clockworks/tiktok-scraper` `searchQueries`. Stored as `source_type = "hashtag"`, `source_query = <seed term>`.
 2. **Official account crawl** — `source_type = "user"`, `source_query = <username>`
 
 Both share the same `VideoRecord` schema. Downstream dedupes by `video_id`.
 
-## Seed hashtags
+> **Naming note.** Search-crawl records keep the legacy value `source_type = "hashtag"`, the `seed_hashtag` column, and `tiktok_hashtag_*` file names so existing data and ETL stay valid. In this project "hashtag" means *seed-term search*, not the TikTok hashtag page. Search results are algorithmically ranked, so the sample over-represents content that is visible in TikTok search.
 
-Canonical list: `configs/hashtags.yaml` (Nike **19** + Adidas **20** = **39**).
+## Seed search terms
+
+Canonical list: `configs/hashtags.yaml` (Nike **19** + Adidas **20** = **39**). Terms are brand- and product-related (e.g. `nike`, `jordan`, `adidassamba`) and are used as search queries.
 
 ### Nike
 

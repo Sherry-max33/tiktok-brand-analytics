@@ -1,5 +1,5 @@
 # =============================================================================
-# hashtags.yaml — Crawl seed hashtags + alias normalization (clean)
+# hashtags.yaml — Crawl seed search terms (TikTok search queries) + alias normalization (clean)
 # =============================================================================
 # Used by:
 #   crawler          → nike / adidas seed lists

@@ -26,6 +26,7 @@ dependencies = [
   "xgboost>=2.0",
   "lightgbm>=4.0",
   "matplotlib>=3.8",
+  "streamlit>=1.36",
 ]
 
 [project.optional-dependencies]

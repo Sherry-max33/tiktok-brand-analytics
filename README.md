@@ -7,7 +7,7 @@ A reproducible, sample-based analytics pipeline comparing **Nike** and **Adidas*
 3. Creator & Collaboration Strategy (official vs UGC; scale × content × BRI)  
 4. Sentiment & topics (NLP)
 
-> **Scope:** Hashtag collection is **sample-based** (ranked feeds, not a full archive). Each crawl records `crawled_at` for reproducibility.
+> **Scope:** Collection is **sample-based**: TikTok search results for brand/product seed terms plus official accounts (algorithmically ranked, not a full archive). Each crawl records `crawled_at` for reproducibility.
 
 Full documentation: **[docs/README.md](docs/README.md)**.
 
@@ -18,7 +18,7 @@ Full documentation: **[docs/README.md](docs/README.md)**.
 ```
 tiktok-brand-analytics/
 ├─ configs/                 # Crawl seeds + ETL rules
-│  ├─ hashtags.yaml         # seed tags + normalize_tags (clean)
+│  ├─ hashtags.yaml         # seed search terms + normalize_tags (clean)
 │  ├─ accounts.yaml         # official accounts
 │  ├─ project.yaml          # sampling / paths / Apify
 │  ├─ taxonomy.yaml         # style / line / category (feature)
@@ -86,6 +86,14 @@ Outputs:
 
 Smoke / small run: `python scripts/smoke_test.py` or `python -m scripts.run_small_pipeline`.
 
+### 4) Run the app
+
+```bash
+streamlit run app/streamlit_app.py
+```
+
+Reads `data/processed/feature/feature_table.parquet` (falls back to mock cards if missing). Video visuals are placeholders; the app links to the original TikTok post and does not host TikTok media. An optional hero asset of our own can be added at `app/assets/hero.mp4` or `app/assets/hero.jpg`.
+
 ---
 
 ## Schema pointers
@@ -95,11 +103,17 @@ Smoke / small run: `python scripts/smoke_test.py` or `python -m scripts.run_smal
 
 ---
 
-## Ethics & limitations
+## Data Source & Disclaimer
 
-- Respect TikTok Terms of Service and local laws.
-- Designed for **public**, **sample-based** analysis.
-- Hashtag feeds are algorithmically ranked; results depend on crawl time and location.
+This is an independent, non-commercial portfolio project developed for educational, research, and data science demonstration purposes.
+
+- **Data Source:** The analysis is based on publicly accessible TikTok content and engagement metadata collected using Apify. The dataset is used to study content, engagement, and brand-related patterns.
+
+- **Data & Media Handling:** The public repository does not host or redistribute original TikTok video files. Non-essential personal identifiers are excluded from the analytical workflow where possible, and the project focuses on content-level and aggregated analytical insights.
+
+- **Independent Analysis:** Findings reflect patterns observed in the collected sample and should not be interpreted as official platform statistics, brand performance reports, or representative measurements of the broader TikTok population.
+
+- **Affiliation:** This project is not affiliated with, sponsored by, or endorsed by TikTok, ByteDance, Nike, or Adidas. All trademarks and brand names belong to their respective owners.
 
 ---
 

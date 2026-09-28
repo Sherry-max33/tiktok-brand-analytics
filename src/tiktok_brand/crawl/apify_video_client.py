@@ -324,18 +324,20 @@ def _run_actor(
     return items, run_meta
 
 
-def fetch_hashtag_videos(
-    hashtag: str,
+def fetch_search_videos(
+    term: str,
     count: int,
     *,
     actor_id: str = DEFAULT_ACTOR_ID,
     api_token: Optional[str] = None,
     scrape_additional_author_meta: bool = True,
 ) -> List[Dict[str, Any]]:
-    tag = hashtag.lstrip("#")
+    """Videos from TikTok search results for a seed term (video tab), not the hashtag page."""
+    query = term.lstrip("#")
     run_input = {
         **_base_run_input(scrape_additional_author_meta),
-        "hashtags": [tag],
+        "searchQueries": [query],
+        "searchSection": "/video",
         "resultsPerPage": min(count, DEFAULT_RESULTS_PER_PAGE),
     }
     items, _ = _run_actor(run_input, actor_id=actor_id, api_token=api_token)

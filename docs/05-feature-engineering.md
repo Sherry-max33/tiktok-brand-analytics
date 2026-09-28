@@ -206,7 +206,7 @@ Matching:
 | Dimension | Field | Example uses |
 |-----------|-------|--------------|
 | Brand | `brand` | Nike vs Adidas splits |
-| Source | `source_type` | Hashtag explore vs profile crawl |
+| Source | `source_type` | Seed-term search (`hashtag`, legacy name) vs official profile crawl (`user`) |
 | Seed | `source_query` / `seed_hashtag` | Tag/account contribution |
 
 ### 2. Time

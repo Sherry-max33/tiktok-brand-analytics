@@ -9,7 +9,7 @@ class VideoRecord:
     platform: str
 
     # data lineage
-    source_type: str  # 'user' | 'hashtag'
+    source_type: str  # 'user' | 'hashtag' (= seed-term search results; legacy name)
     source_query: str
     brand: Optional[str]
 

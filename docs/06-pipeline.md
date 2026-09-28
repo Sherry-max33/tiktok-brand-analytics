@@ -65,5 +65,5 @@ Feature contract highlights (enforced in tests):
 ## Ethics
 
 - Public data only; respect TikTok ToS and local law.
-- Sample-based hashtag feeds; results depend on crawl time and location.
+- Sample-based TikTok search results for seed terms; results depend on crawl time and location.
 - Prefer not to commit large `crawl_exports/` or raw payloads with PII beyond what analysis needs.

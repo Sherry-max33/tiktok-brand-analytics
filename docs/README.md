@@ -12,6 +12,7 @@ Read in order:
 | 04 | [04-taxonomy.md](./04-taxonomy.md) | Engineers / analysts | Multi-label style / line / category cascade |
 | 05 | [05-feature-engineering.md](./05-feature-engineering.md) | Analysts | Engagement, CTA, content type, analysis dims |
 | 06 | [06-pipeline.md](./06-pipeline.md) | Engineers | How to run crawl + ETL + smoke tests |
+| 07 | [07-ai-layer.md](./07-ai-layer.md) | Engineers / analysts | AI Content Analyst + Next Content Brief spec (evidence, guardrails, schemas, phases) |
 | — | [../notebooks/README.md](../notebooks/README.md) | Analysts | **Final analysis notebook run order** (EDA → crosstab → model → themes → `05_summary`) |
 
 **Source of truth (when docs and code disagree):** code + tests + YAML under `configs/`.

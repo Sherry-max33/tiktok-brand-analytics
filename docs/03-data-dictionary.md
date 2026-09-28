@@ -9,8 +9,8 @@ Written by crawl mappers to `data/raw/*.jsonl`. See also [02-crawl.md](./02-craw
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `platform` | str | yes | `"tiktok"` |
-| `source_type` | str | yes | `"hashtag"` \| `"user"` |
-| `source_query` | str | yes | Seed hashtag or username |
+| `source_type` | str | yes | `"hashtag"` (seed-term search results; legacy name) \| `"user"` (official account page) |
+| `source_query` | str | yes | Seed search term or username |
 | `brand` | str \| null | no | `nike` / `adidas` if known |
 | `video_id` | str | yes | Unique video id |
 | `create_time_ts` | int | yes | Publish time, Unix seconds |
@@ -46,7 +46,7 @@ Path: `data/processed/clean/tiktok_videos.parquet` (prod) or `clean_test.parquet
 | All raw video fields except `raw_payload` | pass-through / cleanup | |
 | `normalized_hashtags` | clean | Alias map from `hashtags.yaml` |
 | `brand` | raw or inferred | `nike` / `adidas` / `both` / null |
-| `seed_hashtag` | clean | `source_query` when `source_type=hashtag`, else null |
+| `seed_hashtag` | clean | Seed search term (`source_query`) when `source_type=hashtag`, else null; legacy name |
 | `is_official_brand` | clean | Username in `accounts.yaml` |
 | `create_time` | clean | ISO from `create_time_ts` + project timezone |
 | `collect_count` | raw / alias | Prefer this name over `save_count` |
@@ -72,9 +72,9 @@ The feature table **keeps clean columns** and **adds** derived fields below. Rul
 | `author_verified` | |
 | `author_follower_count` | Used for `creator_tier` |
 | `author_signature` | Used for `creator_type` |
-| `source_type` | `hashtag` \| `user` |
-| `source_query` | Seed tag or username |
-| `seed_hashtag` | Set in clean when `source_type=hashtag` |
+| `source_type` | `hashtag` (seed-term search; legacy name) \| `user` |
+| `source_query` | Seed search term or username |
+| `seed_hashtag` | Seed search term; set in clean when `source_type=hashtag` |
 | `brand` | `nike` / `adidas` / `both` / null |
 | `is_official_brand` | From `accounts.yaml` |
 | `caption_raw` | Original caption |
@@ -221,6 +221,32 @@ Config: `feature_rules.yaml` → `text_embedding` (`enabled`, `model_name`, `min
 | `vf_*_score` / `vs_*_score` | Per-class video-level scores |
 | `appearance_type` | **Removed** (was detector stub → almost always `other`) |
 | `frame_paths` | list[str] | Cached `frame_000.jpg`…`frame_003.jpg` |
+
+##### Frame label confidence
+
+The zero-shot scores are close together: the median lead of the top label over the
+runner-up is 0.008 for setting and 0.014 for format. A visual audit of about 12 videos
+per margin band compared each label with the sampled frames:
+
+| Margin band | Format labels that matched the frames | Setting labels that matched the frames |
+|-------------|---------------------------------------|----------------------------------------|
+| < 0.01 | about half | — |
+| 0.01–0.02 | about 3 in 4 | about 1 in 3 |
+| 0.02–0.04 | nearly all | about 2 in 5 |
+| ≥ 0.04 | nearly all | about 5 in 6 |
+
+The app (`catalog.FRAME_LABEL_MIN_MARGIN`, policy `frame-labels/v2`) keeps a label only
+when its margin reaches **0.02 for format** and **0.04 for setting**. A label below the
+threshold becomes null (unknown) everywhere: the page shows “Not identified”, similarity
+and the AI evidence treat it like a missing label, and `<axis>_status` records
+`low_confidence` (vs `ok` / `missing`). The raw parquet keeps every label and score.
+The dropped top guess is kept in `<axis>_likely` for the page only, shown greyed as
+“Likely: …” (including “Likely: Other”). It is never used
+for similarity or AI evidence.
+
+Coverage at these thresholds (4,457 videos, 693 never frame-processed): 1,319 format labels
+(30%) and 51 setting labels (1%) are kept. Setting is effectively unavailable; the
+classifier rarely separated settings such as studio and home interior.
 
 Config (`visual_embedding`): `frame_fractions: [0.2, 0.4, 0.6, 0.8]`, `download_video: false` by default (enable with `true` or `VISUAL_DOWNLOAD=1`). Cover is only a last-resort fallback.
 
