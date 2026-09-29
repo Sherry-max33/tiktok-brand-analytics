@@ -38,9 +38,49 @@ FEATURED_COUNT = 6
 # empty); an ID that doesn't qualify is silently skipped.
 FEATURED_DEMO_IDS = ("7336649392444689707", "7549618788073737485")
 # Fixed card positions (0-based) on the homepage; 3 is the first card of the second row in
-# the 3-column desktop grid. Other cards keep the automatic order around them.
-FEATURED_SLOTS = {"7465873104259009835": 0, "7336649392444689707": 3, "7598744349328854302": 4}
+# the 3-column desktop grid. Other cards keep the automatic order around them. A slotted
+# video may lack a product line (its card then shows the brand only).
+FEATURED_SLOTS = {
+    "7465873104259009835": 0,
+    "7597641094410669367": 2,
+    "7336649392444689707": 3,
+    "7610110515477630222": 4,
+    "7362654592309464363": 5,
+}
+# Never shown on the homepage (still searchable).
+FEATURED_EXCLUDED = ("7598744349328854302",)
 SEARCH_LIMIT = 20
+
+# Hand-reviewed quality of the curated AI outputs (lower ranks first). Search results are
+# ordered by this tier before performance; unrated videos sit between "ok" and "not ok".
+_GOOD, _ABOVE_OK, _OK, _BELOW_OK, _UNRATED, _NOT_OK = range(6)
+SHOWCASE_TIER = {
+    "7465873104259009835": _GOOD,
+    "7610110515477630222": _GOOD,
+    "7597198442552773902": _GOOD,
+    "7306593126414699822": _GOOD,
+    "7621515669506411797": _GOOD,
+    "7623157311124557086": _GOOD,
+    "7564479769564155158": _GOOD,
+    "7621276091654638862": _ABOVE_OK,
+    "7336649392444689707": _OK,
+    "7549618788073737485": _OK,
+    "7597641094410669367": _OK,
+    "7362654592309464363": _OK,
+    "7353406737233300779": _OK,
+    "7591946281082424598": _OK,
+    "7614154167984147734": _OK,
+    "7584803419152567570": _OK,
+    "7589786563266104598": _OK,
+    "7611337962038562078": _OK,
+    "7612887996542536974": _BELOW_OK,
+    "7598744349328854302": _NOT_OK,
+    "7594922207696932128": _NOT_OK,
+    "7467118868713049377": _NOT_OK,
+    "7623955551726161183": _NOT_OK,
+    "7588663576416570655": _NOT_OK,
+    "7507053168048540971": _NOT_OK,
+}
 
 COLUMNS = [
     "video_id",
@@ -489,14 +529,15 @@ def featured_videos(n: int = FEATURED_COUNT) -> list[dict]:
         # product line and content type are all known, so every card has the same structure.
         eligible = df[
             df["brand"].map(bool)
-            & df["display_lines"].map(bool)
+            & (df["display_lines"].map(bool) | df["video_id"].isin(FEATURED_SLOTS))
             & df["wer"].notna()
             & (df["view_count"] >= FEATURED_MIN_VIEWS)
+            & ~df["video_id"].isin(FEATURED_EXCLUDED)
         ]
         eligible = eligible[eligible.apply(_has_caption, axis=1)]
         pinned_ids = (*FEATURED_DEMO_IDS, *(v for v in FEATURED_SLOTS if v not in FEATURED_DEMO_IDS))
         pinned = eligible[eligible["video_id"].isin(pinned_ids)]
-        pool = eligible[eligible["content_type"].map(bool)]
+        pool = eligible[eligible["content_type"].map(bool) & eligible["display_lines"].map(bool)]
     else:
         pinned_ids = ()
         pinned = pool.iloc[:0]
@@ -521,8 +562,8 @@ def search_videos(
     product: tuple[str, ...] = (),
     limit: int = SEARCH_LIMIT,
 ) -> tuple[list[dict], int]:
-    """Keyword (all words must match) combined with facets. Videos with real reach rank
-    first (by WER), then the rest, so small-audience rate outliers never lead."""
+    """Keyword (all words must match) combined with facets. Ordered by SHOWCASE_TIER, then
+    videos with real reach first (by WER), so small-audience rate outliers never lead."""
     facets = {"brand": brand, "content": content, "product": product}
     df = _apply_facets(load_library(), facets)
     tokens = [t for t in query.lower().replace("#", " #").split() if t]
@@ -533,6 +574,8 @@ def search_videos(
         df = df[mask]
     reach = df["view_count"] >= FEATURED_MIN_VIEWS
     ranked = pd.concat([_by_performance(df[reach]), _by_performance(df[~reach])])
+    tier = ranked["video_id"].map(SHOWCASE_TIER).fillna(_UNRATED)
+    ranked = ranked.iloc[tier.argsort(kind="stable")]
     return _cards(ranked.head(limit), facets), len(df)
 
 
