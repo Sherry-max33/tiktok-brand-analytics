@@ -20,6 +20,9 @@ create table if not exists public.ai_quota (
 alter table public.ai_cache enable row level security;
 alter table public.ai_quota enable row level security;
 revoke all on public.ai_cache, public.ai_quota from anon, authenticated;
+-- Newer projects don't grant table access to service_role by default.
+grant select, insert, update on public.ai_cache to service_role;
+grant select on public.ai_quota to service_role;
 
 -- Takes one of today's (UTC) generation slots; false once daily_limit is reached. The
 -- check and the increment are one statement, so concurrent sessions can't overshoot.

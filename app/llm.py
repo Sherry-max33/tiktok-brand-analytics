@@ -30,8 +30,9 @@ def _env_file_value(name: str) -> str:
     if not path.exists():
         return ""
     for line in path.read_text().splitlines():
-        if line.startswith(f"{name}="):
-            return line.split("=", 1)[1].strip().strip('"').strip("'")
+        key, sep, value = line.partition("=")
+        if sep and key.strip() == name:
+            return value.strip().strip('"').strip("'")
     return ""
 
 
