@@ -83,21 +83,36 @@ def _labels(values: list[str], mapping: dict[str, str]) -> list[str]:
 # ---------- Audience sentiment (comment-level only) ----------
 
 
+def sentiment_by_video(comments: pd.DataFrame) -> pd.DataFrame:
+    """Per-video share of positive / negative comments from per-comment VADER scores
+    (columns video_id, sentiment_score). Used by scripts/export_app_data.py, so the app
+    data holds only these aggregates."""
+    scored = comments.dropna(subset=["sentiment_score"])
+    score = scored["sentiment_score"]
+    return (
+        scored.assign(
+            positive=(score >= SENTIMENT_POS_MIN).astype(float),
+            negative=(score <= SENTIMENT_NEG_MAX).astype(float),
+        )
+        .groupby("video_id")
+        .agg(comments=("sentiment_score", "size"), positive=("positive", "mean"), negative=("negative", "mean"))
+        .reset_index()
+    )
+
+
 @st.cache_data(show_spinner=False)
 def _comment_sentiment() -> dict[str, dict]:
     if not COMMENT_TABLE.exists():
         return {}
-    comments = pd.read_parquet(COMMENT_TABLE, columns=["video_id", "sentiment_score"])
-    comments = comments.dropna(subset=["sentiment_score"])
-    out = {}
-    for video_id, scores in comments.groupby("video_id")["sentiment_score"]:
-        n = len(scores)
-        out[str(video_id)] = {
-            "comments": n,
-            "positive": float((scores >= SENTIMENT_POS_MIN).mean()),
-            "negative": float((scores <= SENTIMENT_NEG_MAX).mean()),
+    table = pd.read_parquet(COMMENT_TABLE)
+    return {
+        str(row.video_id): {
+            "comments": int(row.comments),
+            "positive": float(row.positive),
+            "negative": float(row.negative),
         }
-    return out
+        for row in table.itertuples()
+    }
 
 
 def audience_sentiment(video_id: str) -> dict | None:

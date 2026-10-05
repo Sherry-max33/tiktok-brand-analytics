@@ -29,7 +29,6 @@ COVER_EXTS = (".webp", ".jpg", ".png")
 
 # Official TikTok Embed Player; caption and music are hidden because the page shows them.
 TIKTOK_PLAYER_URL = "https://www.tiktok.com/player/v1/{post_id}?music_info=0&description=0&rel=0"
-_POST_ID = re.compile(r"/(?:video|photo)/(\d+)")
 TIKTOK_POST_URL = "https://www.tiktok.com/@{author}/video/{video_id}"
 
 # Rate-based index is noisy on tiny audiences, so featured picks need real reach.
@@ -101,7 +100,6 @@ COLUMNS = [
     "collect_count",
     "weighted_engagement_rate",
     "brand_relative_engagement_index",
-    "page_url",
     "author_follower_count",
     "product_categories",
     "brand_styles",
@@ -260,9 +258,7 @@ def short_title(caption: str, fallback: str, max_chars: int = 34) -> str:
     return text[0].upper() + text[1:]
 
 
-def post_url(video_id: str, author: str, page_url: str = "") -> str:
-    if page_url:
-        return page_url
+def post_url(video_id: str, author: str) -> str:
     if video_id.isdigit() and author:
         return TIKTOK_POST_URL.format(author=author, video_id=video_id)
     return ""
@@ -282,11 +278,8 @@ def _cover_data_uri(path: str, mtime: float) -> str:
     return f"data:{mime};base64," + base64.b64encode(Path(path).read_bytes()).decode()
 
 
-def tiktok_post_id(video_id: str, page_url: str = "") -> str:
-    """Post ID for the embed player, taken from the original URL, else the video ID."""
-    match = _POST_ID.search(page_url)
-    if match:
-        return match.group(1)
+def tiktok_post_id(video_id: str) -> str:
+    """Post ID for the embed player (the collected video ID is the TikTok post ID)."""
     return video_id if video_id.isdigit() else ""
 
 
@@ -294,7 +287,7 @@ def media_source(row: pd.Series) -> dict:
     """Where a video's visual comes from: a cover in assets/covers/ if one was added,
     otherwise a placeholder. The embed URL is kept for the Analysis page player."""
     vid = row["video_id"]
-    post_id = tiktok_post_id(vid, row.get("page_url") or "")
+    post_id = tiktok_post_id(vid)
     embed_url = TIKTOK_PLAYER_URL.format(post_id=post_id) if post_id else ""
     path = cover_path(vid)
     if path:
@@ -351,7 +344,6 @@ def load_library() -> pd.DataFrame:
         "caption_en",
         "author_username",
         "brand",
-        "page_url",
         "translation_status",
         "creator_tier",
         "caption_lang",
@@ -417,7 +409,7 @@ def to_card(row: pd.Series) -> dict:
         "product": product,
         "content_type": ctype,
         "top_pct": int(row["top_pct"]) if pd.notna(row["top_pct"]) else None,
-        "url": post_url(row["video_id"], row["author_username"], row["page_url"]),
+        "url": post_url(row["video_id"], row["author_username"]),
         "media": media_source(row),
     }
 
@@ -601,7 +593,7 @@ def get_video(video_id: str) -> dict | None:
         saves=int(row["collect_count"]),
         wer=float(row["wer"]) if pd.notna(row["wer"]) else None,
         bri=float(row["bri"]) if pd.notna(row["bri"]) else None,
-        url=post_url(row["video_id"], row["author_username"], row["page_url"]),
+        url=post_url(row["video_id"], row["author_username"]),
         products=[product_label(p) for p in row["display_lines"]],
         product_unresolved=bool(row["product_unresolved"]),
         content_types=[content_type_label(c) for c in row["content_type"]],

@@ -116,8 +116,8 @@ Internal (not prominent in the UI), for guardrails, debugging, retrieval QA and 
   a shared content type with text similarity ≥ 0.40. `visual_presentation` = visual
   similarity ≥ 0.75 or the same frame format. `creative_strategy` = a shared content type,
   social mechanic or brand style. It is deliberately conservative.
-- **Cache**: LLM judgments persist via `ai_cache.py` in the gitignored `data/processed/ai/`,
-  keyed by prompt version, model, video and candidate IDs. Curated videos serve the
+- **Cache**: LLM judgments persist via `ai_cache.py` (Supabase when configured, see §7;
+  otherwise the gitignored `data/processed/ai/`), keyed by prompt version, model, video and candidate IDs. Curated videos serve the
   judgment frozen in their registry record instead (§7). Borderline candidates can flip
   between fresh LLM runs, so persisting judgments is also what keeps the cards stable (see
   Known limitations below).
@@ -390,17 +390,27 @@ Live generation for non-curated videos runs in two stages, each cached separatel
 
 Both stages pass the same admission: cache check → live generation enabled? → per-session
 limit (`AI_SESSION_LIMIT`, default 2) → server-side daily ceiling (`AI_DAILY_LIMIT`, default
-10, file-locked counter in `AI_QUOTA_FILE`) → one run with no retries → persist → display.
+10, UTC days) → one run with no retries → persist → display.
 The limits count videos: within a session, one video's analysis and Brief take a single
-slot. Cached results never consume quota. It fails closed: if the quota state can't be read
-or written, or the limits are misconfigured, nothing is generated, and a failed stage isn't
-retried in the same session. A refusal is shown in place of the AI output (e.g. "Today's AI
+slot. Cached results never consume quota. It fails closed: if the cache or the quota state
+can't be read or written, or the limits are misconfigured, nothing is generated (an
+unreadable cache is never treated as a miss), and a failed stage isn't retried in the same
+session. A refusal is shown in place of the AI output (e.g. "Today's AI
 generation limit has been reached."). `AI_LIVE_GENERATION=off` disables live generation
 entirely. Live outputs are labeled as generated on demand and not reviewed by a person.
 
 Note: links between app pages are full page loads, and each load starts a new Streamlit
 session, so the per-session limit mostly bounds repeated generations within one page view;
 the daily ceiling is the effective cost bound.
+
+Storage: with `SUPABASE_URL` and `SUPABASE_SECRET_KEY` set, the live cache and the daily
+counter live in Supabase (`supabase_store.py`; tables and the atomic `reserve_generation`
+function from `scripts/supabase_setup.sql`), so they survive restarts of a host with an
+ephemeral disk and hold across server instances. The tables hold only AI outputs keyed by
+video ID, version and model, plus one count per day; no visitor data. Row Level Security
+is on with no policies, so only the server-side secret key can read or write. Without
+Supabase, the cache is local JSON in `data/processed/ai/` and the counter a file-locked
+JSON file (`AI_QUOTA_FILE`).
 
 Presentation: saved insights and Briefs (curated or cached) are revealed with a typing
 effect in the browser, once per block per browser tab, starting when the block scrolls into

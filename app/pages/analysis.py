@@ -347,7 +347,9 @@ last_brief = st.session_state.pop("ai_brief_result", None)
 if last_brief and last_brief[0] == video["video_id"]:
     brief_notice = last_brief[1]
 last_analysis = st.session_state.pop("ai_analysis_result", None)
-if ai_found["status"] == "not_generated" and last_analysis and last_analysis[0] == video["video_id"]:
+if ai_found["status"] == "cache_unavailable":
+    ai_notice = ai_service.REFUSALS["cache_unavailable"]
+elif ai_found["status"] == "not_generated" and last_analysis and last_analysis[0] == video["video_id"]:
     ai_notice = last_analysis[1]
 elif ai_found["status"] == "not_generated":
     refusal = ai_service.admission(video["video_id"], "analysis", st.session_state)

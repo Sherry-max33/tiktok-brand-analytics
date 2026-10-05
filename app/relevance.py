@@ -238,7 +238,13 @@ def assess(video_id: str, k: int = analysis_data.SIMILAR_COUNT, *, allow_llm: bo
 
     method, model = "llm", llm.model_name()
     key = cache_key(video_id)
-    judgments = ai_cache.get(CACHE_NAMESPACE, key)
+    try:
+        judgments = ai_cache.get(CACHE_NAMESPACE, key)
+    except ai_cache.CacheUnavailable:
+        # Generation must not mistake an unreadable cache for a miss and pay for a new call.
+        if allow_llm:
+            raise
+        judgments = None
     if judgments is None and allow_llm:
         judgments = _llm_judge(selected, candidates)
         ai_cache.put(CACHE_NAMESPACE, key, judgments)

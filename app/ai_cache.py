@@ -1,7 +1,8 @@
-"""Persistent local cache for LLM outputs (relevance judgments, live generations).
+"""Persistent cache for LLM outputs (relevance judgments, live generations).
 
-Stored in data/processed/ai/<namespace>_cache.json (gitignored). Keys carry the prompt or
-pipeline version, so entries from older versions are simply never looked up again.
+Stored in Supabase when it's configured (supabase_store.py; survives restarts of the deployed
+app), otherwise in data/processed/ai/<namespace>_cache.json (gitignored). Keys carry the
+prompt or pipeline version, so entries from older versions are simply never looked up again.
 Curated showcase outputs don't live here: they are frozen in the committed curated registry
 (curated.py). Caching pins what the app shows; it does not make the underlying LLM judgment
 deterministic.
@@ -14,11 +15,17 @@ import threading
 from pathlib import Path
 
 import catalog
+import supabase_store
 
 LOCAL_DIR = catalog.REPO_ROOT / "data" / "processed" / "ai"
 
+CacheUnavailable = supabase_store.StoreError
+
 _lock = threading.Lock()
 _loaded: dict[Path, dict] = {}
+# Remote hits only: a stored entry never changes under its versioned key, but a miss may be
+# filled by another server instance.
+_remote_hits: dict[tuple[str, str], object] = {}
 
 
 def _path(namespace: str) -> Path:
@@ -35,11 +42,24 @@ def _load(path: Path) -> dict:
 
 
 def get(namespace: str, key: str):
-    return _load(_path(namespace)).get(key)
+    """The cached value or None; raises CacheUnavailable if the remote store can't be read,
+    so a read failure is never mistaken for a miss."""
+    if not supabase_store.configured():
+        return _load(_path(namespace)).get(key)
+    if (namespace, key) not in _remote_hits:
+        value = supabase_store.get(namespace, key)
+        if value is None:
+            return None
+        _remote_hits[(namespace, key)] = value
+    return _remote_hits[(namespace, key)]
 
 
 def put(namespace: str, key: str, value) -> None:
     """Persist; raises OSError if the cache can't be written."""
+    if supabase_store.configured():
+        supabase_store.put(namespace, key, value)
+        _remote_hits[(namespace, key)] = value
+        return
     with _lock:
         path = _path(namespace)
         data = _load(path)

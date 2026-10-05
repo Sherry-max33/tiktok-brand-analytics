@@ -1,10 +1,11 @@
-"""Server-side daily ceiling for new (uncached) AI generations.
+"""Server-side daily (UTC) ceiling for new (uncached) AI generations.
 
-A JSON counter {"date": "YYYY-MM-DD", "count": n} guarded by an exclusive file lock, so
-concurrent sessions in one server process tree can't overshoot. Any failure to read, lock or
-write raises, and callers fail closed (no generation). The file path can be moved with
-AI_QUOTA_FILE; on hosts with ephemeral disks the counter resets when the container restarts,
-so keep the ceiling conservative.
+With Supabase configured, the counter is a database row taken by an atomic function
+(supabase_store.py), so it survives restarts and holds across server instances. Otherwise a
+JSON counter {"date": "YYYY-MM-DD", "count": n} guarded by an exclusive file lock, so
+concurrent sessions in one server process tree can't overshoot; its path can be moved with
+AI_QUOTA_FILE, and on hosts with ephemeral disks it resets when the container restarts. Any
+failure to read, lock or write raises, and callers fail closed (no generation).
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from pathlib import Path
 
 import ai_cache
 import llm
+import supabase_store
 
 
 class QuotaError(RuntimeError):
@@ -34,6 +36,11 @@ def _today() -> str:
 def reserve(daily_limit: int) -> bool:
     """Take one generation slot for today. False when the ceiling is reached; raises
     QuotaError when the quota state can't be verified."""
+    if supabase_store.configured():
+        try:
+            return supabase_store.reserve(daily_limit)
+        except supabase_store.StoreError as error:
+            raise QuotaError(str(error)) from error
     path = _file()
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -63,6 +70,11 @@ def reserve(daily_limit: int) -> bool:
 
 def usage() -> dict:
     """Today's count; None when the quota state exists but can't be read."""
+    if supabase_store.configured():
+        try:
+            return {"date": _today(), "count": supabase_store.usage()}
+        except supabase_store.StoreError:
+            return {"date": _today(), "count": None}
     path = _file()
     try:
         raw = path.read_text() if path.exists() else ""

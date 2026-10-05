@@ -1,11 +1,13 @@
 """Export the slim, committed data the Streamlit app reads (app/data/).
 
-The research tables under data/processed/ stay local (gitignored). The app needs only:
+The research tables under data/processed/ stay local (gitignored). The app gets only what it
+uses:
 - videos.parquet: the catalog columns (catalog.COLUMNS) plus the caption and visual
-  embeddings used for similar-video retrieval.
-- comment_sentiment.parquet: one row per scored comment with only its video_id and VADER
-  score, so per-video audience sentiment can be computed. No comment text, comment IDs or
-  commenter identities are exported.
+  embeddings used for similar-video retrieval. Public post metadata only: no account IDs,
+  bios or source URLs (post links are rebuilt from the handle and video ID), and the
+  collection time is reduced to its date.
+- comment_sentiment.parquet: one row per video with its scored-comment count and positive /
+  negative shares. No comment text, comment IDs, per-comment rows or commenter identities.
 
     python scripts/export_app_data.py
 
@@ -24,6 +26,7 @@ logging.getLogger("streamlit").setLevel(logging.ERROR)
 
 import pandas as pd  # noqa: E402
 
+import analysis_data  # noqa: E402
 import catalog  # noqa: E402
 
 SOURCE_DIR = ROOT / "data" / "processed" / "feature"
@@ -35,17 +38,19 @@ EMBEDDINGS = ["text_embedding", "visual_embedding"]
 def main() -> None:
     catalog.APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    videos = pd.read_parquet(VIDEO_SOURCE)
-    keep = [c for c in dict.fromkeys(catalog.COLUMNS + EMBEDDINGS) if c in videos.columns]
-    videos[keep].to_parquet(catalog.FEATURE_TABLE, index=False, compression="zstd")
+    source = pd.read_parquet(VIDEO_SOURCE)
+    keep = [c for c in dict.fromkeys(catalog.COLUMNS + EMBEDDINGS) if c in source.columns]
+    videos = source[keep].copy()
+    videos["crawl_at"] = pd.to_datetime(videos["crawl_at"], errors="coerce").dt.normalize()
+    videos.to_parquet(catalog.FEATURE_TABLE, index=False, compression="zstd")
 
     comments = pd.read_parquet(COMMENT_SOURCE, columns=["video_id", "sentiment_score"])
-    comments = comments.dropna(subset=["sentiment_score"])
-    comments.to_parquet(catalog.COMMENT_SENTIMENT, index=False, compression="zstd")
+    sentiment = analysis_data.sentiment_by_video(comments)
+    sentiment.to_parquet(catalog.COMMENT_SENTIMENT, index=False, compression="zstd")
 
-    for path, df in ((catalog.FEATURE_TABLE, videos[keep]), (catalog.COMMENT_SENTIMENT, comments)):
+    for path, df in ((catalog.FEATURE_TABLE, videos), (catalog.COMMENT_SENTIMENT, sentiment)):
         size = path.stat().st_size / 1e6
-        print(f"{path.relative_to(ROOT)}: {len(df):,} rows, {len(df.columns)} columns, {size:.1f} MB")
+        print(f"{path.relative_to(ROOT)}: {len(df):,} rows, {list(df.columns)}, {size:.1f} MB")
 
 
 if __name__ == "__main__":

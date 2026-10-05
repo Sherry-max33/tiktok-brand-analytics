@@ -50,6 +50,7 @@ REFUSALS = {
     "session_limit": "This session has reached its AI generation limit.",
     "daily_limit": "Today's AI generation limit has been reached. Please check back tomorrow.",
     "quota_unavailable": "AI generation limits can't be verified right now.",
+    "cache_unavailable": "Saved AI analysis can't be loaded right now. Please try again later.",
     "already_failed": "AI generation failed for this video. The rest of the analysis is unaffected.",
 }
 
@@ -168,18 +169,22 @@ def run_pipeline(video_id: str, *, attempt: int = 1) -> dict:
 def lookup(video_id: str) -> dict:
     """Read-only; never calls the API. Returns {"source", "record", "status"}:
     source "curated" | "cache" | None; status "ready", "curated_pending" (a showcase video
-    whose output isn't approved yet) or "not_generated". A cached record's "brief" is None
-    until its Brief has been generated."""
+    whose output isn't approved yet), "not_generated" or "cache_unavailable" (the cache
+    can't be read, so nothing may be generated). A cached record's "brief" is None until its
+    Brief has been generated."""
     video_id = str(video_id)
     if curated.is_curated(video_id):
         record = curated.approved_record(video_id)
         if record:
             return {"source": "curated", "record": record, "status": "ready"}
         return {"source": None, "record": None, "status": "curated_pending"}
-    analysis = ai_cache.get(ANALYSIS_NAMESPACE, _analysis_key(video_id))
+    try:
+        analysis = ai_cache.get(ANALYSIS_NAMESPACE, _analysis_key(video_id))
+        brief_ = ai_cache.get(BRIEF_NAMESPACE, _brief_key(video_id)) if analysis else None
+    except ai_cache.CacheUnavailable:
+        return {"source": None, "record": None, "status": "cache_unavailable"}
     if analysis:
-        record = {**analysis, "brief": ai_cache.get(BRIEF_NAMESPACE, _brief_key(video_id))}
-        return {"source": "cache", "record": record, "status": "ready"}
+        return {"source": "cache", "record": {**analysis, "brief": brief_}, "status": "ready"}
     return {"source": None, "record": None, "status": "not_generated"}
 
 
