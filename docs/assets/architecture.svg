@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1010" viewBox="0 0 1000 1010" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1f1e1c"/>
+    </marker>
+  </defs>
+  <rect width="1000" height="1010" fill="#faf8f5"/>
+
+  <text x="500" y="42" font-size="12" letter-spacing="3" fill="#8f8a82" text-anchor="middle">TIKTOK BRAND CONTENT INTELLIGENCE &#183; END-TO-END ARCHITECTURE</text>
+
+  <!-- Source -->
+  <rect x="200" y="64" width="600" height="64" rx="4" fill="#ffffff" stroke="#e7e2da"/>
+  <text x="500" y="90" font-size="15" font-weight="700" fill="#1f1e1c" text-anchor="middle">Public TikTok data</text>
+  <text x="500" y="112" font-size="12" fill="#55524d" text-anchor="middle">Apify &#183; search results for 39 brand and product terms + official brand accounts &#183; comments</text>
+  <line x1="500" y1="128" x2="500" y2="150" stroke="#1f1e1c" stroke-width="1.4" marker-end="url(#a)"/>
+
+  <!-- Pipeline -->
+  <rect x="200" y="154" width="600" height="64" rx="4" fill="#ffffff" stroke="#e7e2da"/>
+  <text x="500" y="180" font-size="15" font-weight="700" fill="#1f1e1c" text-anchor="middle">Data pipeline</text>
+  <text x="500" y="202" font-size="12" fill="#55524d" text-anchor="middle">raw JSONL &#8594; clean tables &#8594; feature tables (Parquet) &#183; 4,457 videos &#183; 10,406 comments</text>
+  <line x1="500" y1="218" x2="500" y2="240" stroke="#1f1e1c" stroke-width="1.4" marker-end="url(#a)"/>
+
+  <!-- Feature layer -->
+  <rect x="40" y="244" width="920" height="120" rx="4" fill="#ffffff" stroke="#1f1e1c"/>
+  <text x="500" y="270" font-size="15" font-weight="700" fill="#1f1e1c" text-anchor="middle">Multimodal feature layer</text>
+  <g font-size="12" fill="#55524d" text-anchor="middle">
+    <rect x="60" y="284" width="140" height="62" rx="3" fill="#f1ede6"/>
+    <text x="130" y="308" font-weight="700" fill="#1f1e1c">Text</text>
+    <text x="130" y="328">multilingual SBERT</text>
+    <rect x="210" y="284" width="140" height="62" rx="3" fill="#f1ede6"/>
+    <text x="280" y="308" font-weight="700" fill="#1f1e1c">Visual</text>
+    <text x="280" y="328">CLIP on sampled frames</text>
+    <rect x="360" y="284" width="140" height="62" rx="3" fill="#f1ede6"/>
+    <text x="430" y="308" font-weight="700" fill="#1f1e1c">Creator</text>
+    <text x="430" y="328">official / UGC &#183; tier</text>
+    <rect x="510" y="284" width="140" height="62" rx="3" fill="#f1ede6"/>
+    <text x="580" y="308" font-weight="700" fill="#1f1e1c">Strategy</text>
+    <text x="580" y="328">content type &#183; style &#183; CTA</text>
+    <rect x="660" y="284" width="140" height="62" rx="3" fill="#f1ede6"/>
+    <text x="730" y="308" font-weight="700" fill="#1f1e1c">Engagement</text>
+    <text x="730" y="328">WER &#183; BRI &#183; Top X%</text>
+    <rect x="810" y="284" width="130" height="62" rx="3" fill="#f1ede6"/>
+    <text x="875" y="308" font-weight="700" fill="#1f1e1c">Comments</text>
+    <text x="875" y="328">sentiment &#183; topics</text>
+  </g>
+
+  <!-- Branch -->
+  <path d="M255,364 L255,404" stroke="#1f1e1c" stroke-width="1.4" fill="none" marker-end="url(#a)"/>
+  <path d="M745,364 L745,404" stroke="#1f1e1c" stroke-width="1.4" fill="none" marker-end="url(#a)"/>
+
+  <text x="255" y="398" font-size="10.5" letter-spacing="2" fill="#8f8a82" text-anchor="middle" dx="80">RESEARCH</text>
+  <text x="745" y="398" font-size="10.5" letter-spacing="2" fill="#8f8a82" text-anchor="middle" dx="70">PRODUCT</text>
+
+  <!-- Research column -->
+  <g font-size="12" fill="#55524d" text-anchor="middle">
+    <rect x="60" y="408" width="390" height="92" rx="4" fill="#ffffff" stroke="#e7e2da"/>
+    <text x="255" y="434" font-size="14.5" font-weight="700" fill="#1f1e1c">Business analysis</text>
+    <text x="255" y="458">Content &#183; Commerce &#183; Creators &#183; Audience</text>
+    <text x="255" y="478">within-brand BRI &#183; crosstabs &#183; statistical tests</text>
+    <line x1="255" y1="500" x2="255" y2="522" stroke="#1f1e1c" stroke-width="1.4" marker-end="url(#a)"/>
+
+    <rect x="60" y="526" width="390" height="92" rx="4" fill="#ffffff" stroke="#e7e2da"/>
+    <text x="255" y="552" font-size="14.5" font-weight="700" fill="#1f1e1c">ML screening</text>
+    <text x="255" y="576">CatBoost + CLIP &#183; pre-publish features only</text>
+    <text x="255" y="596">creator-grouped CV &#183; Lift@10 2.39&#215; &#183; AUC 0.686</text>
+    <line x1="255" y1="618" x2="255" y2="640" stroke="#1f1e1c" stroke-width="1.4" marker-end="url(#a)"/>
+
+    <rect x="60" y="644" width="390" height="92" rx="4" fill="#f1ede6" stroke="#e7e2da"/>
+    <text x="255" y="670" font-size="14.5" font-weight="700" fill="#1f1e1c">Executive business analysis</text>
+    <text x="255" y="694">four findings &#8594; action and experiment framework</text>
+    <text x="255" y="714">notebooks/06_executive_analysis.ipynb</text>
+  </g>
+
+  <!-- Product column -->
+  <g font-size="12" fill="#55524d" text-anchor="middle">
+    <rect x="550" y="408" width="390" height="68" rx="4" fill="#ffffff" stroke="#e7e2da"/>
+    <text x="745" y="432" font-size="14.5" font-weight="700" fill="#1f1e1c">Comparable retrieval</text>
+    <text x="745" y="456">Top-10% WER pool &#183; SBERT + CLIP + strategy &#183; one per creator</text>
+    <line x1="745" y1="476" x2="745" y2="492" stroke="#1f1e1c" stroke-width="1.4" marker-end="url(#a)"/>
+
+    <rect x="550" y="496" width="390" height="68" rx="4" fill="#ffffff" stroke="#e7e2da"/>
+    <text x="745" y="520" font-size="14.5" font-weight="700" fill="#1f1e1c">Relevance validation</text>
+    <text x="745" y="544">LLM judge + code rule &#183; 2+ relevant needed for a pattern</text>
+    <line x1="745" y1="564" x2="745" y2="580" stroke="#1f1e1c" stroke-width="1.4" marker-end="url(#a)"/>
+
+    <rect x="550" y="584" width="390" height="68" rx="4" fill="#ffffff" stroke="#e7e2da"/>
+    <text x="745" y="608" font-size="14.5" font-weight="700" fill="#1f1e1c">Trusted evidence layer</text>
+    <text x="745" y="632">structured context &#183; null = unknown &#183; uncaptured modalities excluded</text>
+    <line x1="745" y1="652" x2="745" y2="668" stroke="#1f1e1c" stroke-width="1.4" marker-end="url(#a)"/>
+
+    <rect x="550" y="672" width="390" height="68" rx="4" fill="#ffffff" stroke="#1f1e1c"/>
+    <text x="745" y="696" font-size="14.5" font-weight="700" fill="#1f1e1c">Grounded LLM: Content Analyst &#8594; Next Content Brief</text>
+    <text x="745" y="720">strict JSON schema &#183; evidence-cited claims &#183; testable hypothesis</text>
+    <line x1="745" y1="740" x2="745" y2="756" stroke="#1f1e1c" stroke-width="1.4" marker-end="url(#a)"/>
+
+    <rect x="550" y="760" width="390" height="68" rx="4" fill="#ffffff" stroke="#e7e2da"/>
+    <text x="745" y="784" font-size="14.5" font-weight="700" fill="#1f1e1c">Validation &#183; abstention &#183; human review</text>
+    <text x="745" y="808">code checks + one repair &#183; withhold Brief &#183; 25 curated approved</text>
+    <line x1="745" y1="828" x2="745" y2="844" stroke="#1f1e1c" stroke-width="1.4" marker-end="url(#a)"/>
+
+    <rect x="550" y="848" width="390" height="68" rx="4" fill="#1f1e1c"/>
+    <text x="745" y="872" font-size="14.5" font-weight="700" fill="#faf8f5">Streamlit decision-support app</text>
+    <text x="745" y="896" fill="#d9d3ca">curated &#8594; cached &#8594; quota-limited live &#183; Supabase &#183; TikTok player</text>
+  </g>
+
+  <!-- Shared definitions link -->
+  <path d="M450,690 C500,690 500,442 546,442" fill="none" stroke="#8f8a82" stroke-width="1.2" stroke-dasharray="4 4"/>
+
+  <text x="40" y="970" font-size="11" fill="#8f8a82">Dashed line: research and product share metric definitions (WER, BRI, Top 10%). The app selects comparables by observed WER, not by the screening model&#8217;s score.</text>
+</svg>

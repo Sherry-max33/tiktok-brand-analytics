@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="440" viewBox="0 0 1000 440" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f1e1c"/></marker>
+    <marker id="arrow-soft" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8f8a82"/></marker>
+  </defs>
+  <rect width="1000" height="440" fill="#faf8f5"/>
+  <text x="30" y="38" font-size="15.5" font-weight="700" fill="#1f1e1c">The LLM does not discover the evidence; it synthesizes what the pipeline produced and validated.</text>
+  <path d="M140,112 L140,82 L860,82 L860,108" fill="none" stroke="#8f8a82" stroke-width="1.2" stroke-dasharray="4 4" marker-end="url(#arrow-soft)"/>
+  <rect x="340" y="72" width="320" height="20" fill="#faf8f5"/>
+  <text x="500" y="86" font-size="11.5" fill="#6f6a64" text-anchor="middle">The Brief re-reads the original evidence, not only the Analyst</text>
+  <g font-size="12" fill="#55524d">
+    <rect x="30" y="112" width="220" height="150" rx="4" fill="#ffffff" stroke="#e7e2da"/>
+    <text x="46" y="136" font-size="10.5" letter-spacing="1.5" fill="#8f8a82">01 &#183; EVIDENCE</text>
+    <text x="46" y="160" font-size="14.5" font-weight="700" fill="#1f1e1c">Structured evidence</text>
+    <text x="46" y="184">WER &#183; BRI &#183; Top X%</text>
+    <text x="46" y="202">Content profile and frames</text>
+    <text x="46" y="220">Comment sentiment, if collected</text>
+    <text x="46" y="244" fill="#8f8a82">null = unknown, never absent</text>
+    <rect x="270" y="112" width="220" height="150" rx="4" fill="#ffffff" stroke="#e7e2da"/>
+    <text x="286" y="136" font-size="10.5" letter-spacing="1.5" fill="#8f8a82">02 &#183; RETRIEVE + VALIDATE</text>
+    <text x="286" y="160" font-size="14.5" font-weight="700" fill="#1f1e1c">Validated comparables</text>
+    <text x="286" y="184">SBERT + CLIP + strategy labels</text>
+    <text x="286" y="202">Top-10% pool, one per creator</text>
+    <text x="286" y="220">Relevance check per candidate</text>
+    <text x="286" y="244" fill="#8f8a82">rejected never reach the LLM</text>
+    <rect x="510" y="112" width="220" height="150" rx="4" fill="#ffffff" stroke="#1f1e1c"/>
+    <text x="526" y="136" font-size="10.5" letter-spacing="1.5" fill="#8f8a82">03 &#183; SYNTHESIZE</text>
+    <text x="526" y="160" font-size="14.5" font-weight="700" fill="#1f1e1c">AI Content Analyst</text>
+    <text x="526" y="184">Single-video observations</text>
+    <text x="526" y="202">Shared trait (1 comparable)</text>
+    <text x="526" y="220">Patterns (2+ comparables)</text>
+    <text x="526" y="244" fill="#8f8a82">0&#8211;3 insights, never padded</text>
+    <rect x="750" y="112" width="220" height="150" rx="4" fill="#ffffff" stroke="#1f1e1c"/>
+    <text x="766" y="136" font-size="10.5" letter-spacing="1.5" fill="#8f8a82">04 &#183; DECIDE</text>
+    <text x="766" y="160" font-size="14.5" font-weight="700" fill="#1f1e1c">Next Content Brief</text>
+    <text x="766" y="184">Creative hypothesis</text>
+    <text x="766" y="202">One test variable, A vs B</text>
+    <text x="766" y="220">Controls, WER-led metrics</text>
+    <text x="766" y="244" fill="#8f8a82">withheld if it fails checks</text>
+  </g>
+  <line x1="250" y1="187" x2="266" y2="187" stroke="#1f1e1c" stroke-width="1.4" marker-end="url(#arrow)"/>
+  <line x1="490" y1="187" x2="506" y2="187" stroke="#1f1e1c" stroke-width="1.4" marker-end="url(#arrow)"/>
+  <line x1="730" y1="187" x2="746" y2="187" stroke="#1f1e1c" stroke-width="1.4" marker-end="url(#arrow)"/>
+  <rect x="30" y="292" width="940" height="122" rx="4" fill="#f1ede6" stroke="#e7e2da"/>
+  <text x="50" y="318" font-size="10.5" letter-spacing="1.5" fill="#8f8a82">GUARDRAILS &#183; ENFORCED BY SCHEMA AND CODE, NOT ONLY BY PROMPT</text>
+  <g font-size="12.5" fill="#1f1e1c">
+    <text x="50" y="348" font-weight="700">Provenance</text>
+    <text x="50" y="366" fill="#55524d">claims cite only fields that hold a value</text>
+    <text x="50" y="392" font-weight="700">Validation + one repair</text>
+    <text x="50" y="410" fill="#55524d">no causal wording, no generalization</text>
+    <text x="360" y="348" font-weight="700">Observability boundary</text>
+    <text x="360" y="366" fill="#55524d">no on-screen text, voiceover or audio claims</text>
+    <text x="360" y="392" font-weight="700">Visual reliability gate</text>
+    <text x="360" y="410" fill="#55524d">low-confidence frame labels become unknown</text>
+    <text x="670" y="348" font-weight="700">Abstention</text>
+    <text x="670" y="366" fill="#55524d">thin evidence: insights only, or no Brief</text>
+    <text x="670" y="392" font-weight="700">Human review</text>
+    <text x="670" y="410" fill="#55524d">25 curated analyses approved</text>
+  </g>
+</svg>

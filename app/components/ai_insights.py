@@ -56,7 +56,7 @@ _SCRIPT = """
     let index = 0, pos = 0, frame = null;
     // Paced by elapsed time, not by tick count (timers run late), so a whole block takes
     // about TARGET_MS however long it is.
-    const TARGET_MS = 900;
+    const TARGET_MS = 600;
     const total = parts.reduce((sum, part) => sum + part.text.length, 0);
     let shown = 0, started = null;
     const unhide = (node) => {
@@ -114,7 +114,11 @@ _SCRIPT = """
   const scan = () => {
     doc.querySelectorAll(".ai-reveal").forEach((el) => {
       if (!el.dataset.revealed) {
-        if (reduce || seen(el.dataset.revealKey)) { el.dataset.revealed = "done"; return; }
+        // Already on screen via the CSS fallback (the script arrived late): don't blank it.
+        const box = el.getBoundingClientRect();
+        const shown = win.getComputedStyle(el).visibility === "visible"
+          && box.height > 0 && box.top < win.innerHeight && box.bottom > 0;
+        if (reduce || shown || seen(el.dataset.revealKey)) { el.dataset.revealed = "done"; return; }
         prepare(el);
       }
       if (el.__aiParts) visibility.observe(el);

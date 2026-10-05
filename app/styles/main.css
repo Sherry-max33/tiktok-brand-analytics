@@ -1250,7 +1250,7 @@ button.brief-generate:disabled::after { content: none; }
 
 /* Typing reveal (components/ai_insights.py). Unrevealed text stays hidden until the script
    takes over; if the script never runs, it becomes visible on its own. */
-.ai-reveal:not([data-revealed]) { visibility: hidden; animation: ai-reveal-fallback 0s 2.5s forwards; }
+.ai-reveal:not([data-revealed]) { visibility: hidden; animation: ai-reveal-fallback 0s 1.5s forwards; }
 @keyframes ai-reveal-fallback { to { visibility: visible; } }
 .ai-reveal .ai-wait { opacity: 0; }
 .ai-reveal > *, .ai-reveal .profile-item { transition: opacity 0.25s ease; }

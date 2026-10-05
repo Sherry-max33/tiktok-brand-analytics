@@ -1,22 +1,41 @@
 # Analysis notebooks
 
-Nike vs Adidas TikTok analytics. Run in order unless noted.
+Nike vs Adidas TikTok analytics, in two layers.
+
+## Executive layer
+
+**[`06_executive_analysis.ipynb`](06_executive_analysis.ipynb)**: the 5–10 minute business report for stakeholders and hiring managers. It runs on its own (headline figures only, no data files needed).
+
+1. Awareness & Engagement
+2. Social Commerce
+3. Creator Strategy
+4. Sentiment & Topics
+5. Executive synthesis → action and experiment framework
+
+## Supporting evidence
+
+Full analysis behind each headline, for technical review: distributions, every crosstab, statistical tests, model diagnostics, and robustness checks.
+
+| Notebook | Evidence for |
+|----------|--------------|
+| [`01_eda.ipynb`](01_eda.ipynb) | Distributions and coverage (no strategy crosstabs) |
+| [`02_descriptive_crosstabs.ipynb`](02_descriptive_crosstabs.ipynb) | Awareness & Engagement: landscape, brand mix, within-brand BRI |
+| [`03_engagement_modeling.ipynb`](03_engagement_modeling.ipynb) | Pre-publish screening: tiering, Top-Q screening, modality ablation, SHAP |
+| [`04b_theme_commerce.ipynb`](04b_theme_commerce.ipynb) | Social Commerce: commerce intensity and engagement |
+| [`04c_theme_influencer.ipynb`](04c_theme_influencer.ipynb) | Creator Strategy: official vs UGC, creator tier, collaboration |
+| [`04d_theme_sentiment.ipynb`](04d_theme_sentiment.ipynb) | Sentiment & Topics: comment sentiment and topic taxonomy |
+
+## Working notebooks
 
 | Notebook | Role |
 |----------|------|
-| `00_shared_setup.ipynb` | Paths, feature table, leakage checklist |
-| `01_eda.ipynb` | Distributions and coverage (no strategy crosstabs) |
-| `02_descriptive_crosstabs.ipynb` | Theme 1 strategy: landscape, brand mix, engagement |
-| `03_engagement_modeling.ipynb` | Theme 1 predictive: tiering, Top-Q screening, ablation, SHAP |
-| `04a_theme_awareness.ipynb` | Theme 1 write-up (fold locked bullets into `05` when signed off) |
-| `04b_theme_commerce.ipynb` | Theme 2: commerce intensity and engagement |
-| `04c_theme_influencer.ipynb` | Theme 3: creator scale and collaboration |
-| `04d_theme_sentiment.ipynb` | Theme 4: comment sentiment and topics |
-| `05_summary.ipynb` | Report-facing summary of locked commercial conclusions |
+| `00_shared_setup.ipynb` | Paths, feature table, leakage checklist (run first) |
+| `04a_theme_awareness.ipynb` | Awareness write-up drawing on `02`–`03` |
+| `05_summary.ipynb` | Earlier summary of locked conclusions; superseded by `06` |
 
-Code: `src/tiktok_brand/analysis/`.
+Run `00` → `01` → `02` → `03` → `04a`–`04d` to reproduce from `data/processed/feature/feature_table.parquet`. Code: `src/tiktok_brand/analysis/`.
 
-No separate per-theme "brief" notebooks. Keep full analysis in `02`–`04d`; put signed-off takeaways in `05_summary.ipynb`.
+Keep full analysis in `02`–`04d`; when a conclusion is signed off, update the matching section of `06`.
 
 ## Outcomes
 
@@ -32,7 +51,7 @@ BRI > 1 means above that brand’s typical WER. Do not use BRI as the headline K
 
 **Theme 1 (`02`–`03`, write-up `04a`).** Crosstabs for strategy; models for tiering and shortlist screening only. Author-grouped CV; pre-publish features.
 
-**Theme 2 (`04b`).** Caption commerce cues (Purchase / Discovery / Promo / Giveaway) → intensity bins. Not sales or conversion. Locked summary in `05`.
+**Theme 2 (`04b`).** Caption commerce cues (Purchase / Discovery / Promo / Giveaway) → intensity bins. Not sales or conversion.
 
 **Theme 3 (`04c`).** Official vs UGC; UGC `creator_tier` × content → BRI. Collaboration = caption language, not verified deals.
 
