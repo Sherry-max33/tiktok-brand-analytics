@@ -1,0 +1,25 @@
+{
+  "videos": 4457,
+  "videos_by_brand": {
+    "nike": 2317,
+    "adidas": 2140
+  },
+  "valid_engagement": 4453,
+  "content_labeled": 887,
+  "content_labeled_by_brand": {
+    "adidas": 471,
+    "nike": 416
+  },
+  "collaboration_videos": 146,
+  "comment_videos": 105,
+  "comments": 10406,
+  "comments_scored": 8716,
+  "top10_wer_threshold": 0.01729170999758258,
+  "screening": {
+    "lift_at_5": 3.1,
+    "lift_at_10": 2.39,
+    "lift_at_20": 2.06,
+    "n_videos": 4418,
+    "n_creators": 2614
+  }
+}

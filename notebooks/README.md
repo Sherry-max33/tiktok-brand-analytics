@@ -4,13 +4,14 @@ Nike vs Adidas TikTok analytics, in two layers.
 
 ## Executive layer
 
-**[`06_executive_analysis.ipynb`](06_executive_analysis.ipynb)**: the 5–10 minute business report for stakeholders and hiring managers. It runs on its own (headline figures only, no data files needed).
+**[`06_executive_analysis.ipynb`](06_executive_analysis.ipynb)**: the 5–10 minute business report for stakeholders and hiring managers. Its charts use the same plotting functions as `02`–`04d` and read the grouped aggregates in [`executive_data/`](executive_data/) (medians, shares and counts per group; no video- or account-level rows), so it runs without the local feature tables. Rebuild those aggregates with `python scripts/build_executive_data.py`.
 
-1. Awareness & Engagement
-2. Social Commerce
-3. Creator Strategy
-4. Sentiment & Topics
-5. Executive synthesis → action and experiment framework
+1. Earn attention: content type vs each brand's baseline
+2. Carry commercial intent: commerce cues vs engagement
+3. Choose the messenger: official vs UGC, creator tier × content type
+4. Read the response: topic and Product Review comment sentiment
+5. Prioritize: pre-publish screening (Lift@K)
+6. Insight to action, and what not to claim
 
 ## Supporting evidence
 

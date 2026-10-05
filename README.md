@@ -1,17 +1,18 @@
-# TikTok Brand Content Intelligence
+# TikTok Brand Content Intelligence: From Business Analysis to Grounded AI
 
-### From 4,457 public Nike & Adidas TikTok videos to evidence-backed content decisions
+### Turning 4,457 public Nike & Adidas TikTok videos into evidence-backed content insights and testable creative directions
 
-An end-to-end content intelligence system that combines brand strategy analysis, multimodal machine learning, comparable-content retrieval and grounded LLM synthesis to identify what is worth testing next.
+An end-to-end content intelligence system that combines business analysis, predictive screening, multimodal retrieval and grounded LLM synthesis to find where high-performing content concentrates, surface patterns that recur across validated comparables, and turn them into what to test next.
 
-**4,457 videos** · **4 business lenses** · **2.39× Lift@10 screening model** · **25 human-reviewed AI analyses** · **live Streamlit product**
+<sub>Built with Python · NLP & Sentiment · Multimodal ML (SBERT + CLIP) · CatBoost · Grounded LLM (OpenAI API) · Streamlit · Supabase</sub>
 
-**[Live demo](https://tiktok-brand-analytics.streamlit.app/)** · **[Executive business analysis](notebooks/06_executive_analysis.ipynb)** · **[Methodology & docs](docs/README.md)**
+**4,457 videos** · **4 business lenses** · **2.39× Lift@10** · **25 human-reviewed AI analyses** · **live product**
+
+**🌐 [Live Demo](https://tiktok-brand-analytics.streamlit.app/)** · **▶ [Watch Demo](https://youtu.be/1ZC_xYpYzi0)** · **📊 [Executive Business Analysis](notebooks/06_executive_analysis.ipynb)** · **ⓘ [Methodology & Docs](docs/README.md)**
 
 <p align="center">
-  <img src="docs/assets/app-ai-analyst.png" alt="AI Content Analyst panel in the Streamlit app: a pattern shared with similar high performers, a single-video observation and an audience signal, each with what may be worth testing" width="820">
+  <a href="https://tiktok-brand-analytics.streamlit.app/"><img src="docs/assets/app-home.jpg" alt="TikTok AI Content Analyst home page: search videos, products, creators or keywords, explore by brand, content type and product, with quick filters such as Samba, Jordan, Vibe / OOTD, Tutorial / Utility and Tech Fleece" width="900"></a>
 </p>
-<p align="center"><sub>The AI Content Analyst on a curated example: findings are tied to this video and its validated similar high performers, and framed as worth testing, not as causes.</sub></p>
 
 ---
 
@@ -61,25 +62,27 @@ In ~10.4k comments on 105 high-engagement videos, Adidas draws warmer conversati
 </tr>
 </table>
 
-**→ [Explore the full Executive Business Analysis](notebooks/06_executive_analysis.ipynb)** (5–10 minute read, four decision-grade charts)
+<p align="center">
+  <img src="docs/assets/brand-content-map.png" alt="Content strategy map: median BRI by content type for Adidas and Nike. Vibe/OOTD and Collaboration above baseline for both; Product Showcase above for Adidas (1.04) and below for Nike (0.73); Tutorial/Utility and Product Review above for Nike, below for Adidas; Product Promo below for both" width="760">
+</p>
 
-## Product Experience
+**→ [Explore the full Executive Business Analysis](notebooks/06_executive_analysis.ipynb)** (5–10 minute read, six decision-grade charts)
 
-The Streamlit app turns the analysis into a workflow a content strategist can use on any video in the library:
+## End-to-End Architecture
 
-**Discover** content by keyword, brand, content type and product → **Performance** against the brand's baseline (WER, BRI, Top X%) → **Content profile** from frames, caption and hashtags → **Audience signals** where comments were collected → **Similar high performers**, validated for relevance → **AI Content Analyst** → **Next Content Brief** with a test plan.
+<p align="center">
+  <img src="docs/assets/architecture.svg" alt="End-to-end architecture: public TikTok data, data pipeline, multimodal feature layer, then a research branch (business analysis, ML screening, executive analysis) and a product branch (retrieval, relevance validation, evidence layer, grounded LLM, validation, Streamlit app)" width="900">
+</p>
 
-Try it: **[tiktok-brand-analytics.streamlit.app](https://tiktok-brand-analytics.streamlit.app/)**, or open a curated example directly: **[Adidas creator showcase](https://tiktok-brand-analytics.streamlit.app/analysis?video=7614154167984147734)**. Posts play through TikTok's official player; the project does not host video files.
+Data moves through a medallion-style pipeline: raw JSONL records → cleaned, deduplicated tables → analysis-ready Parquet feature tables. The research branch and the app share the same metric definitions; the app selects comparables by observed engagement, not by the screening model's score.
+
+The sections below follow this diagram: the research branch first, then the product branch.
 
 ## Business Analysis
 
 The four lenses are one decision sequence, not four dashboards:
 
 **Earn attention** → **Carry commercial intent** → **Choose the messenger** → **Read the response**
-
-<p align="center">
-  <img src="docs/assets/brand-content-bri.png" alt="Brand by content territory BRI: Adidas Vibe/OOTD 1.21, Nike Tutorial/Utility 1.11, collaboration above 1.0 for both, Product Promo below 1.0 for both" width="760">
-</p>
 
 Engagement is compared **within brand**: BRI divides a video's weighted engagement rate (WER) by its brand's median, so 1.21× means 21% above that brand's typical video. This avoids treating Adidas's higher overall engagement as proof that its content choices are better. The resulting strategy is **Observe → Compare → Hypothesize → Test**: the data does not identify a universal TikTok formula, but it does show where the next experiment should start.
 
@@ -97,7 +100,7 @@ Predicting a video's exact engagement rate barely beat a brand-median baseline (
 
 - **Leakage-safe.** Pre-publish features only (creator, content strategy, caption, timing, SBERT text embeddings, CLIP visual features); all 15 post-publication engagement columns are excluded.
 - **Honest validation.** Cross-validation is grouped by creator, so no account appears in both training and test, and top-10% labels are set on training folds only.
-- **What moved the needle.** CatBoost was compared with XGBoost; adding CLIP visual features gave the largest single gain (Lift@10 2.03× → 2.59× on the default model).
+- **What moved the needle.** CatBoost was compared with XGBoost; in a modality ablation, adding CLIP visual features gave the largest single gain (Lift@10 2.03× → 2.59× on the default CatBoost model).
 - **How to read it.** SHAP shows the model relies most on visual and text semantics and creator audience. These are associations used for ranking, not causal levers.
 
 The model is a **screening and prioritization tool, not a viral-content predictor.** Details: [`03_engagement_modeling.ipynb`](notebooks/03_engagement_modeling.ipynb).
@@ -124,6 +127,14 @@ Cross-brand comparables are allowed when genuinely relevant; brand is not a crit
 - **AI Content Analyst** separates what is true of this one video from what recurs across validated comparables: an observation, a shared characteristic (one comparable) or a pattern (two or more). It produces 0–3 insights and is never padded to a count.
 - **Next Content Brief** turns supported insights into one creative hypothesis: a concept, an opening hook, a single test variable with variants A and B, controls held constant and WER-led metrics. It re-reads the original evidence and comparables alongside the Analyst's insights, so a second generation can catch an interpretation error instead of amplifying it.
 
+<table>
+<tr>
+<td width="50%" valign="top"><img src="docs/assets/app-ai-analyst.png" alt="AI Content Analyst panel for a top-2% Adidas Gazelle creator video: a product-showcase pattern shared with all three similar high performers and a personal-unboxing observation, each with what may be worth testing"></td>
+<td width="50%" valign="top"><img src="docs/assets/app-next-brief.png" alt="Next Content Brief for the same video: a creative idea, opening hook, creative direction, engagement approach, rationale, one test variable (personal excitement vs. neutral caption) and WER-led metrics"></td>
+</tr>
+</table>
+<p align="center"><sub>The AI Content Analyst and the Next Content Brief on the same curated example: findings are tied to this video and its validated similar high performers, framed as worth testing rather than as causes, and the Brief turns them into a single testable variable.</sub></p>
+
 ## Reliability & Guardrails
 
 Grounded does not automatically mean correct, so the controls sit in the schema and in code, not only in the prompt:
@@ -141,13 +152,13 @@ Grounded does not automatically mean correct, so the controls sit in the schema 
 
 The full specification, including the problems review caught and how each was fixed, is in [the AI layer guide](docs/07-ai-layer.md).
 
-## End-to-End Architecture
+## Product Experience
 
-<p align="center">
-  <img src="docs/assets/architecture.svg" alt="End-to-end architecture: public TikTok data, data pipeline, multimodal feature layer, then a research branch (business analysis, ML screening, executive analysis) and a product branch (retrieval, relevance validation, evidence layer, grounded LLM, validation, Streamlit app)" width="900">
-</p>
+The Streamlit app turns the analysis into a workflow a content strategist can use on any video in the library:
 
-Data moves through a medallion-style pipeline: raw JSONL records → cleaned, deduplicated tables → analysis-ready Parquet feature tables. The research branch and the app share the same metric definitions; the app selects comparables by observed engagement, not by the screening model's score.
+**Discover** content by keyword, brand, content type and product → **Performance** against the brand's baseline (WER, BRI, Top X%) → **Content profile** from frames, caption and hashtags → **Audience signals** where comments were collected → **Similar high performers**, validated for relevance → **AI Content Analyst** → **Next Content Brief** with a test plan.
+
+Try it: **[tiktok-brand-analytics.streamlit.app](https://tiktok-brand-analytics.streamlit.app/)**, or open a curated example directly: **[Adidas Gazelle creator showcase](https://tiktok-brand-analytics.streamlit.app/analysis?video=7465873104259009835)**. Posts play through TikTok's official player; the project does not host video files.
 
 ## Tech Stack
 
@@ -156,7 +167,7 @@ Data moves through a medallion-style pipeline: raw JSONL records → cleaned, de
 - **Modeling:** scikit-learn, CatBoost, XGBoost, SHAP
 - **AI layer:** OpenAI API with strict JSON schemas, code-side validators, curated registry with human QA
 - **Product:** Streamlit, Supabase (persistent cache and atomic daily quota), deployed on Streamlit Community Cloud
-- **Quality & ops:** pytest (58 tests), GitHub Actions keep-alive for the hosted app
+- **Quality & ops:** pytest (59 tests), GitHub Actions keep-alive for the hosted app
 
 ## Repository Guide
 

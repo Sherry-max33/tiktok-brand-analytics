@@ -19,5 +19,8 @@ data/processed/**
 !data/**/.gitkeep
 !data/**/README.md
 
+# Local demo recordings may show TikTok video frames; publish via YouTube, never the repo.
+demo_media/
+
 # OS
 .DS_Store
