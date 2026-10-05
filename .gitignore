@@ -10,18 +10,14 @@ build/
 .streamlit/secrets.toml
 .ipynb_checkpoints/
 
-# Data
+# Data: only the folder layout (.gitkeep) and READMEs are tracked, never data files.
+# Directories are re-included so git can reach the placeholders inside them.
 data/crawl_exports/*
 data/raw/*
-data/processed/*
-!data/crawl_exports/.gitkeep
-!data/raw/.gitkeep
-!data/processed/.gitkeep
-!data/processed/clean/.gitkeep
-!data/processed/feature/.gitkeep
-!data/processed/frames/
-data/processed/frames/**
-!data/processed/frames/README.md
+data/processed/**
+!data/processed/**/
+!data/**/.gitkeep
+!data/**/README.md
 
 # OS
 .DS_Store
