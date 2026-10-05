@@ -19,7 +19,10 @@ import yaml
 
 APP_DIR = Path(__file__).resolve().parent
 REPO_ROOT = APP_DIR.parent
-FEATURE_TABLE = REPO_ROOT / "data" / "processed" / "feature" / "feature_table.parquet"
+# Slim, committed exports of the research tables (scripts/export_app_data.py).
+APP_DATA_DIR = APP_DIR / "data"
+FEATURE_TABLE = APP_DATA_DIR / "videos.parquet"
+COMMENT_SENTIMENT = APP_DATA_DIR / "comment_sentiment.parquet"
 TAXONOMY = REPO_ROOT / "configs" / "taxonomy.yaml"
 COVERS_DIR = APP_DIR / "assets" / "covers"
 COVER_EXTS = (".webp", ".jpg", ".png")

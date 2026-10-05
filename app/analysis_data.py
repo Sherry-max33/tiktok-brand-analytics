@@ -13,7 +13,7 @@ import streamlit as st
 
 import catalog
 
-COMMENT_TABLE = catalog.REPO_ROOT / "data" / "processed" / "feature" / "comment_feature_table.parquet"
+COMMENT_TABLE = catalog.COMMENT_SENTIMENT
 
 # Same thresholds as the 04d sentiment notebook (VADER compound).
 SENTIMENT_POS_MIN = 0.05

@@ -1,0 +1,6 @@
+# Streamlit app only (deployment). The research pipeline's dependencies are in pyproject.toml.
+streamlit>=1.64,<2
+pandas>=2.2,<3
+numpy>=2.0,<3
+pyarrow>=17
+pyyaml>=6.0

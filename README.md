@@ -101,7 +101,7 @@ python -m scripts.crawl_comments   # optional; run after video collection
 python -m scripts.build_dataset
 ```
 
-The app and analysis notebooks read `data/processed/feature/feature_table.parquet`. Live collection requires an Apify account and incurs usage under the configured Apify actors. Non-English sentiment translation and first-time embedding/model downloads may require network access; translation can be disabled with `BUILD_MT=0` (the default for bulk builds).
+The analysis notebooks read `data/processed/feature/feature_table.parquet`; the app reads a slim export of it in `app/data/` (refresh with `make app_data` after a rebuild). Live collection requires an Apify account and incurs usage under the configured Apify actors. Non-English sentiment translation and first-time embedding/model downloads may require network access; translation can be disabled with `BUILD_MT=0` (the default for bulk builds).
 
 ### 4. Open the analyst app
 
@@ -111,7 +111,9 @@ streamlit run app/streamlit_app.py
 
 The app provides content discovery, performance and content profiles, similar high performers, AI insights, and a next-content brief. Live AI generation requires `OPENAI_API_KEY` and can be configured with environment variables or Streamlit Secrets. Curated or cached analyses can be served without a new generation; live generation is subject to configured quotas. See [the AI layer guide](docs/07-ai-layer.md) for behavior and guardrails.
 
-TikTok posts are linked or shown through TikTok's player; this project does not host original video files. Locally generated data is not automatically distributed with the repository, so build or provide the feature table before using the app with a full dataset.
+TikTok posts are linked or shown through TikTok's player; this project does not host original video files. The research tables under `data/processed/` stay local. The app runs on the committed export in `app/data/` (`scripts/export_app_data.py`): the catalog columns and embeddings it uses, and per-comment sentiment scores only, with no comment text or commenter identities.
+
+**Deploying (Streamlit Community Cloud).** Point the app at `app/streamlit_app.py`; dependencies install from `app/requirements.txt` (the app's own, lighter than the pipeline's). Add `OPENAI_API_KEY` in the app's Secrets, and optionally `AI_DAILY_LIMIT`, `AI_SESSION_LIMIT` or `AI_LIVE_GENERATION = "off"`. The host's disk is ephemeral, so the daily quota counter and cached live generations reset when the app restarts; set a budget limit on the OpenAI project as the hard cost bound. Curated outputs are committed and unaffected.
 
 ### 5. Run checks
 

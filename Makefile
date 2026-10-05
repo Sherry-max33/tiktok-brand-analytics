@@ -10,5 +10,8 @@ crawl_hashtags:
 build:
 	python -m scripts.build_dataset
 
+app_data:
+	python scripts/export_app_data.py
+
 test:
 	pytest -q
