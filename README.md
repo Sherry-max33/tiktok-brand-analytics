@@ -4,7 +4,7 @@
 
 An end-to-end content intelligence system that combines business analysis, predictive screening, multimodal retrieval and grounded LLM synthesis to find where high-performing content concentrates, surface patterns that recur across validated comparables, and turn them into what to test next.
 
-<sub>Built with Python · NLP & Sentiment · Multimodal ML (SBERT + CLIP) · CatBoost · Grounded LLM (OpenAI API) · Streamlit · Supabase</sub>
+<sub>Built with Python · NLP & Sentiment · Multimodal ML (SBERT + CLIP) · CatBoost · RAG + Grounded LLM (OpenAI API) · Streamlit · Supabase</sub>
 
 **4,457 videos** · **4 business lenses** · **2.39× Lift@10** · **25 human-reviewed AI analyses** · **live product**
 
