@@ -8,7 +8,7 @@ An end-to-end content intelligence system that combines business analysis, predi
 
 **4,457 videos** · **4 business lenses** · **2.39× Lift@10** · **25 human-reviewed AI analyses** · **live product**
 
-**🌐 [Live Demo](https://tiktok-brand-analytics.streamlit.app/)** · **▶ [Watch Demo](https://youtu.be/1ZC_xYpYzi0)** · **📊 [Executive Business Analysis](notebooks/06_executive_analysis.ipynb)** · **ⓘ [Methodology & Docs](docs/README.md)**
+**🌐 [Live Demo](https://tiktok-brand-analytics.streamlit.app/)** · **▶ [Watch Demo](https://youtu.be/1ZC_xYpYzi0)** · **📊 [Executive Business Analysis](notebooks/06_executive_analysis.ipynb)** · **🧩 [Architecture](#end-to-end-architecture)** · **ⓘ [Methodology & Docs](docs/README.md)**
 
 <p align="center">
   <a href="https://tiktok-brand-analytics.streamlit.app/"><img src="docs/assets/app-home.jpg" alt="TikTok AI Content Analyst home page: search videos, products, creators or keywords, explore by brand, content type and product, with quick filters such as Samba, Jordan, Vibe / OOTD, Tutorial / Utility and Tech Fleece" width="900"></a>
@@ -66,7 +66,7 @@ In ~10.4k comments on 105 high-engagement videos, Adidas draws warmer conversati
   <img src="docs/assets/brand-content-map.png" alt="Content strategy map: median BRI by content type for Adidas and Nike. Vibe/OOTD and Collaboration above baseline for both; Product Showcase above for Adidas (1.04) and below for Nike (0.73); Tutorial/Utility and Product Review above for Nike, below for Adidas; Product Promo below for both" width="760">
 </p>
 
-**→ [Explore the full Executive Business Analysis](notebooks/06_executive_analysis.ipynb)** (5–10 minute read, six decision-grade charts)
+**→ [Explore the full Executive Business Analysis](notebooks/06_executive_analysis.ipynb)** (5–10 minute read)
 
 ## End-to-End Architecture
 
