@@ -56,7 +56,7 @@ _SCRIPT = """
     let index = 0, pos = 0, frame = null;
     // Paced by elapsed time, not by tick count (timers run late), so a whole block takes
     // about TARGET_MS however long it is.
-    const TARGET_MS = 600;
+    const TARGET_MS = 1200;
     const total = parts.reduce((sum, part) => sum + part.text.length, 0);
     let shown = 0, started = null;
     const unhide = (node) => {
