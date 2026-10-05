@@ -6,16 +6,18 @@ Pipeline (the same code for curated and live generations):
 Serving order for a video:
 1. Curated showcase video: its QA-approved frozen record is served directly. Curated videos
    never trigger live generation, even before approval.
-2. Persistent cache, keyed by (video_id, AI pipeline version, model): served without using
-   any quota.
-3. Otherwise nothing is generated on page view. A user can request an on-demand generation,
-   which runs only after the session limit and the server-side daily ceiling both pass.
-   Anything that can't be verified (quota file, key, live switch) fails closed, and a failed
-   API call is not retried.
+2. Persistent cache of live generations, served without using any quota. A live generation
+   has two stages, cached separately: the analysis (relevance + Analyst), keyed by the
+   analysis version, and the Brief, keyed by the full pipeline version.
+3. Otherwise the analysis page starts a live analysis when it opens; the Brief is generated
+   only when the user asks for it. Both stages pass the same admission: the session limit
+   and the server-side daily ceiling count videos, so one video's analysis and Brief take a
+   single slot within a session. Anything that can't be verified (quota file, key, live
+   switch) fails closed, and a failed stage is not retried in the same session.
 
 Settings (environment or Streamlit Secrets): OPENAI_API_KEY, OPENAI_MODEL,
 AI_LIVE_GENERATION ("off" disables live generation), AI_SESSION_LIMIT (default 2),
-AI_DAILY_LIMIT (default 25), AI_QUOTA_FILE.
+AI_DAILY_LIMIT (default 10), AI_QUOTA_FILE.
 """
 
 from __future__ import annotations
@@ -37,20 +39,39 @@ import relevance
 # capture. The full version also embeds each prompt version, so any prompt bump invalidates
 # cached generations automatically.
 PIPELINE_REVISION = "ai-pipeline/2"
-CACHE_NAMESPACE = "generations"
+ANALYSIS_NAMESPACE = "live_analysis"
+BRIEF_NAMESPACE = "live_brief"
 DEFAULT_SESSION_LIMIT = 2
-DEFAULT_DAILY_LIMIT = 25
+DEFAULT_DAILY_LIMIT = 10
 SESSION_KEY = "ai_generation_log"
+
+REFUSALS = {
+    "disabled": "AI analysis isn't available for this video.",
+    "session_limit": "This session has reached its AI generation limit.",
+    "daily_limit": "Today's AI generation limit has been reached. Please check back tomorrow.",
+    "quota_unavailable": "AI generation limits can't be verified right now.",
+    "already_failed": "AI generation failed for this video. The rest of the analysis is unaffected.",
+}
+
+
+def analysis_version() -> str:
+    return "+".join([PIPELINE_REVISION, relevance.PROMPT_VERSION, analyst.PROMPT_VERSION])
 
 
 def pipeline_version() -> str:
-    return "+".join(
-        [PIPELINE_REVISION, relevance.PROMPT_VERSION, analyst.PROMPT_VERSION, brief.PROMPT_VERSION]
-    )
+    return f"{analysis_version()}+{brief.PROMPT_VERSION}"
 
 
-def cache_key(video_id: str) -> str:
+def _analysis_key(video_id: str) -> str:
+    return f"{video_id}|{analysis_version()}|{llm.model_name()}"
+
+
+def _brief_key(video_id: str) -> str:
     return f"{video_id}|{pipeline_version()}|{llm.model_name()}"
+
+
+def _now() -> str:
+    return dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
 
 
 # ---------- pipeline ----------
@@ -99,9 +120,16 @@ def servable_brief(record: dict) -> dict | None:
     """The Brief to display, or None when it was withheld: a Brief that failed validation or
     that human QA withheld is never shown, and the Analyst insights are served on their own."""
     generated_brief = record["brief"]
+    if generated_brief is None:
+        return None
     if generated_brief["status"] != "generated" or (record.get("qa") or {}).get("brief_withheld"):
         return None
     return generated_brief["brief"]
+
+
+def brief_requestable(record: dict) -> bool:
+    """A live analysis whose Brief hasn't been generated yet and could be."""
+    return record["brief"] is None and record["analyst"]["status"] == "generated"
 
 
 def run_pipeline(video_id: str, *, attempt: int = 1) -> dict:
@@ -120,7 +148,7 @@ def run_pipeline(video_id: str, *, attempt: int = 1) -> dict:
             "brief": brief.PROMPT_VERSION,
         },
         "generation_attempt": attempt,
-        "generated_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+        "generated_at": _now(),
         "relevance": {
             "method": assessment["method"],
             "picks": assessment["picks"],
@@ -140,15 +168,17 @@ def run_pipeline(video_id: str, *, attempt: int = 1) -> dict:
 def lookup(video_id: str) -> dict:
     """Read-only; never calls the API. Returns {"source", "record", "status"}:
     source "curated" | "cache" | None; status "ready", "curated_pending" (a showcase video
-    whose output isn't approved yet) or "not_generated"."""
+    whose output isn't approved yet) or "not_generated". A cached record's "brief" is None
+    until its Brief has been generated."""
     video_id = str(video_id)
     if curated.is_curated(video_id):
         record = curated.approved_record(video_id)
         if record:
             return {"source": "curated", "record": record, "status": "ready"}
         return {"source": None, "record": None, "status": "curated_pending"}
-    record = ai_cache.get(CACHE_NAMESPACE, cache_key(video_id))
-    if record:
+    analysis = ai_cache.get(ANALYSIS_NAMESPACE, _analysis_key(video_id))
+    if analysis:
+        record = {**analysis, "brief": ai_cache.get(BRIEF_NAMESPACE, _brief_key(video_id))}
         return {"source": "cache", "record": record, "status": "ready"}
     return {"source": None, "record": None, "status": "not_generated"}
 
@@ -174,43 +204,111 @@ def live_generation_enabled() -> bool:
     return llm.available() and llm.setting("AI_LIVE_GENERATION").lower() not in ("off", "0", "false")
 
 
-def generate_on_demand(video_id: str, session: MutableMapping) -> dict:
-    """User-requested generation for a non-curated video. Returns {"status", "record",
-    "message"}; status "ready" (served from curated/cache or newly generated), or one of
-    "curated_pending", "disabled", "session_limit", "daily_limit", "quota_unavailable",
-    "already_failed", "failed"."""
-    video_id = str(video_id)
-    found = lookup(video_id)
-    if found["status"] != "not_generated":
-        return {**found, "message": None}
+def _log(session: MutableMapping) -> dict:
+    return session.setdefault(SESSION_KEY, {"videos": [], "failed": []})
 
-    log = session.setdefault(SESSION_KEY, {"count": 0, "failed": []})
-    if video_id in log["failed"]:
-        return _refusal("already_failed", "Generation failed for this video; it won't be retried.")
+
+def admission(video_id: str, stage: str, session: MutableMapping) -> str | None:
+    """Read-only check (reserves nothing) of whether a live `stage` ("analysis" | "brief")
+    may run for this video: None, or a refusal status from REFUSALS."""
+    log = _log(session)
+    if f"{video_id}:{stage}" in log["failed"]:
+        return "already_failed"
     if not live_generation_enabled():
-        return _refusal("disabled", "Live AI generation is not available right now.")
+        return "disabled"
+    if video_id in log["videos"]:
+        return None
     try:
         session_limit = _int_setting("AI_SESSION_LIMIT", DEFAULT_SESSION_LIMIT)
         daily_limit = _int_setting("AI_DAILY_LIMIT", DEFAULT_DAILY_LIMIT)
     except ValueError:
-        return _refusal("quota_unavailable", "Generation limits are misconfigured.")
-    if log["count"] >= session_limit:
-        return _refusal("session_limit", "This session has reached its AI generation limit.")
+        return "quota_unavailable"
+    if len(log["videos"]) >= session_limit:
+        return "session_limit"
+    used = quota.usage()["count"]
+    if used is None:
+        return "quota_unavailable"
+    if used >= daily_limit:
+        return "daily_limit"
+    return None
+
+
+def _admit(video_id: str, stage: str, session: MutableMapping) -> str | None:
+    """admission(), then take the video's daily slot if this session hasn't yet."""
+    refusal = admission(video_id, stage, session)
+    log = _log(session)
+    if refusal or video_id in log["videos"]:
+        return refusal
     try:
-        if not quota.reserve(daily_limit):
-            return _refusal("daily_limit", "Today's AI generation limit has been reached.")
+        if not quota.reserve(_int_setting("AI_DAILY_LIMIT", DEFAULT_DAILY_LIMIT)):
+            return "daily_limit"
     except quota.QuotaError:
-        return _refusal("quota_unavailable", "Generation limits can't be verified right now.")
+        return "quota_unavailable"
+    log["videos"].append(video_id)
+    return None
 
-    log["count"] += 1
+
+def generate_analysis(video_id: str, session: MutableMapping) -> str | None:
+    """Live relevance + Analyst for a non-curated video, cached on success. Returns None
+    (ready, or nothing to do) or a refusal status; "failed" when the API call failed."""
+    video_id = str(video_id)
+    if lookup(video_id)["status"] != "not_generated":
+        return None
+    refusal = _admit(video_id, "analysis", session)
+    if refusal:
+        return refusal
     try:
-        record = run_pipeline(video_id)
-        ai_cache.put(CACHE_NAMESPACE, cache_key(video_id), record)
+        assessment = relevance.assess(video_id, allow_llm=True)
+        analysis = analyst.generate(analysis_context.build_analysis_context(video_id))
+        ai_cache.put(
+            ANALYSIS_NAMESPACE,
+            _analysis_key(video_id),
+            {
+                "video_id": video_id,
+                "model": llm.model_name(),
+                "pipeline_version": analysis_version(),
+                "prompt_versions": {
+                    "relevance": relevance.PROMPT_VERSION,
+                    "analyst": analyst.PROMPT_VERSION,
+                },
+                "generated_at": _now(),
+                "relevance": {
+                    "method": assessment["method"],
+                    "picks": assessment["picks"],
+                    "retrieval_assessment": assessment["retrieval_assessment"],
+                    "candidates": assessment["candidates"],
+                },
+                "analyst": analysis,
+            },
+        )
     except (llm.LLMError, OSError):
-        log["failed"].append(video_id)
-        return _refusal("failed", "AI generation failed. The rest of the analysis is unaffected.")
-    return {"source": "live", "record": record, "status": "ready", "message": None}
+        _log(session)["failed"].append(f"{video_id}:analysis")
+        return "failed"
+    return None
 
 
-def _refusal(status: str, message: str) -> dict:
-    return {"source": None, "record": None, "status": status, "message": message}
+def generate_brief(video_id: str, session: MutableMapping) -> str | None:
+    """User-requested Brief for a cached live analysis, cached on success (including a
+    withheld Brief, so it isn't regenerated). Same return convention as generate_analysis."""
+    video_id = str(video_id)
+    found = lookup(video_id)
+    if found["source"] != "cache" or not brief_requestable(found["record"]):
+        return None
+    refusal = _admit(video_id, "brief", session)
+    if refusal:
+        return refusal
+    try:
+        # The relevance judgment is cached by the analysis stage, so this rebuilds the
+        # exact context the Analyst saw without another call.
+        relevance.assess(video_id, allow_llm=True)
+        context = analysis_context.build_analysis_context(video_id)
+        generated = brief.generate(context, found["record"]["analyst"])
+        ai_cache.put(
+            BRIEF_NAMESPACE,
+            _brief_key(video_id),
+            {**generated, "pipeline_version": pipeline_version(), "generated_at": _now()},
+        )
+    except (llm.LLMError, OSError):
+        _log(session)["failed"].append(f"{video_id}:brief")
+        return "failed"
+    return None

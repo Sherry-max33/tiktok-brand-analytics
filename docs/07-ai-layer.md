@@ -375,17 +375,38 @@ tokens-per-minute limit is close to one full pipeline run).
 ### Serving
 
 Order of lookups, none of which calls the API: approved curated record → curated but not
-approved (shows "not available yet"; never generates live) → persistent cache keyed by
-`(video_id, pipeline_version, model)` → not generated.
+approved (shows "not available yet"; never generates live) → persistent cache of live
+generations → not generated.
 
-On-demand generation for non-curated videos (`generate_on_demand`) runs only on an explicit
-user request: cache check → live generation enabled? → per-session limit
-(`AI_SESSION_LIMIT`, default 2) → server-side daily ceiling (`AI_DAILY_LIMIT`, default 25,
-file-locked counter in `AI_QUOTA_FILE`) → one pipeline run with no retries → persist →
-display. Cached results never consume quota. It fails closed: if the quota state can't be
-read or written, or the limits are misconfigured, nothing is generated, and a failed
-generation isn't retried in the same session. `AI_LIVE_GENERATION=off` disables it
-entirely.
+Live generation for non-curated videos runs in two stages, each cached separately:
+- **Analysis** (`generate_analysis`: relevance + Analyst), cached under
+  `(video_id, analysis_version, model)`. It starts automatically when the analysis page
+  opens, after the rest of the page has rendered; the AI section shows an "Analyzing"
+  state meanwhile.
+- **Brief** (`generate_brief`), cached under `(video_id, pipeline_version, model)`. It runs
+  only when the user clicks "Next Content Brief", over the cached analysis and the same
+  cached relevance judgment. A Brief that fails validation is cached too (and withheld), so
+  it isn't regenerated.
+
+Both stages pass the same admission: cache check → live generation enabled? → per-session
+limit (`AI_SESSION_LIMIT`, default 2) → server-side daily ceiling (`AI_DAILY_LIMIT`, default
+10, file-locked counter in `AI_QUOTA_FILE`) → one run with no retries → persist → display.
+The limits count videos: within a session, one video's analysis and Brief take a single
+slot. Cached results never consume quota. It fails closed: if the quota state can't be read
+or written, or the limits are misconfigured, nothing is generated, and a failed stage isn't
+retried in the same session. A refusal is shown in place of the AI output (e.g. "Today's AI
+generation limit has been reached."). `AI_LIVE_GENERATION=off` disables live generation
+entirely. Live outputs are labeled as generated on demand and not reviewed by a person.
+
+Note: links between app pages are full page loads, and each load starts a new Streamlit
+session, so the per-session limit mostly bounds repeated generations within one page view;
+the daily ceiling is the effective cost bound.
+
+Presentation: saved insights and Briefs (curated or cached) are revealed with a typing
+effect in the browser, once per block per browser tab, starting when the block scrolls into
+view (a closed Brief starts when opened); clicking skips it, and it is off under
+`prefers-reduced-motion`. The full saved text is already in the page; nothing is generated
+or altered by the effect.
 
 The API key is read server-side only (environment, Streamlit Secrets or local `.env`, all
 gitignored) and never reaches the browser. All non-AI features work with no key or when

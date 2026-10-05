@@ -62,8 +62,13 @@ def reserve(daily_limit: int) -> bool:
 
 
 def usage() -> dict:
+    """Today's count; None when the quota state exists but can't be read."""
+    path = _file()
     try:
-        state = json.loads(_file().read_text())
+        raw = path.read_text() if path.exists() else ""
+        state = json.loads(raw) if raw.strip() else {}
     except (OSError, ValueError):
         return {"date": _today(), "count": None}
-    return state if state.get("date") == _today() else {"date": _today(), "count": 0}
+    if state.get("date") != _today():
+        return {"date": _today(), "count": 0}
+    return state if isinstance(state.get("count"), int) else {"date": _today(), "count": None}

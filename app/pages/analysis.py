@@ -15,7 +15,7 @@ import streamlit as st
 import analysis_data
 import ai_service
 import catalog
-from components.ai_insights import analyst_section, render_copy_script
+from components.ai_insights import GENERATE_BRIEF_KEY, analyst_section, render_ai_script
 from components.html import esc, load_css, render
 from components.media import (
     add_official_previews,
@@ -333,34 +333,81 @@ profile_html += f'{sentiment_group}<div class="profile-item senti">{sentiment_bo
 
 # ---------- AI content analyst + next content brief (right) ----------
 
-analyst_html = analyst_section(video["video_id"])
+# A non-curated video's analysis is generated live when the page opens (after the page has
+# rendered, so nothing else waits on it); its Brief only when the user clicks for it. The
+# visible Brief button clicks the hidden Streamlit button in `brief_trigger`, which reruns
+# this script.
+ai_found = ai_service.lookup(video["video_id"])
+# Always present, so the button appearing or disappearing never shifts the blocks below
+# (a shift would remount them, reloading the player).
+brief_trigger = st.empty()
+ai_pending = ai_notice = None
+brief_notice = None
+last_brief = st.session_state.pop("ai_brief_result", None)
+if last_brief and last_brief[0] == video["video_id"]:
+    brief_notice = last_brief[1]
+last_analysis = st.session_state.pop("ai_analysis_result", None)
+if ai_found["status"] == "not_generated" and last_analysis and last_analysis[0] == video["video_id"]:
+    ai_notice = last_analysis[1]
+elif ai_found["status"] == "not_generated":
+    refusal = ai_service.admission(video["video_id"], "analysis", st.session_state)
+    if refusal:
+        ai_notice = ai_service.REFUSALS[refusal]
+    else:
+        ai_pending = "analysis"
+elif ai_found["source"] == "cache" and ai_service.brief_requestable(ai_found["record"]):
+    if brief_trigger.button("Next Content Brief", key=GENERATE_BRIEF_KEY):
+        refusal = ai_service.admission(video["video_id"], "brief", st.session_state)
+        if refusal:
+            brief_notice = ai_service.REFUSALS[refusal]
+        else:
+            ai_pending = "brief"
 
-
-render(
-    f"""
-    <section class="section analysis">
-      <a class="back-link" href="/" target="_self">← Discover</a>
-      <div class="analysis-grid">
-        <aside class="analysis-left">
-          {selected_html}
-        </aside>
-        <div class="analysis-right">
-          <section class="module">
-            <p class="eyebrow module-title">Performance</p>
-            <div class="perf">{perf_html}</div>
-            <div class="stats engagement">{stat_html}</div>
-            {counts_note}
-          </section>
-          <section class="module">
-            <p class="eyebrow module-title">Content profile</p>
-            <dl class="profile">{profile_html}</dl>
-          </section>
-          {analyst_html}
-        </div>
-      </div>
-      {similar_html}
-    </section>
-    """
+analyst_html = analyst_section(
+    video["video_id"],
+    ai_found,
+    pending=ai_pending,
+    notice=ai_notice,
+    brief_notice=brief_notice,
+    brief_open=bool(last_brief) and last_brief[0] == video["video_id"] and last_brief[1] is None,
 )
+
+
+# Separate blocks, so a rerun after a live generation re-renders only the AI section and
+# leaves the TikTok player (and anything the viewer is watching) untouched.
+with st.container(key="analysis_page"):
+    render('<a class="back-link" href="/" target="_self">← Discover</a>')
+    with st.container(key="analysis_grid"):
+        with st.container(key="analysis_left"):
+            render(f'<aside class="analysis-left">{selected_html}</aside>')
+        with st.container(key="analysis_right"):
+            render(
+                f"""
+                <div class="analysis-right">
+                  <section class="module">
+                    <p class="eyebrow module-title">Performance</p>
+                    <div class="perf">{perf_html}</div>
+                    <div class="stats engagement">{stat_html}</div>
+                    {counts_note}
+                  </section>
+                  <section class="module">
+                    <p class="eyebrow module-title">Content profile</p>
+                    <dl class="profile">{profile_html}</dl>
+                  </section>
+                </div>
+                """
+            )
+            render(analyst_html)
+    render(similar_html)
 render_embed_script()
-render_copy_script()
+render_ai_script()
+
+if ai_pending:
+    generate = ai_service.generate_analysis if ai_pending == "analysis" else ai_service.generate_brief
+    status = generate(video["video_id"], st.session_state)
+    message = None
+    if status:
+        message = ai_service.REFUSALS["already_failed" if status == "failed" else status]
+    # A refusal is shown on the rerun instead of being re-attempted by it.
+    st.session_state[f"ai_{ai_pending}_result"] = (video["video_id"], message)
+    st.rerun()
