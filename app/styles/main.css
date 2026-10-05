@@ -1351,9 +1351,18 @@ button.brief-generate:disabled::after { content: none; }
   .sim-list { gap: 12px; }
   .selected .player-frame { max-width: 320px; }
   .selected { margin-bottom: 56px; }
+  /* Single column: the AI analysis follows the video directly rather than sitting below the
+     metrics. Flattening the right column lets its blocks be reordered in CSS alone, so
+     nothing is remounted (a remount would reload the player). */
+  div.st-key-analysis_grid > div:has(> div.st-key-analysis_right),
+  div.st-key-analysis_right { display: contents; }
+  div.st-key-analysis_grid > div:has(> div.st-key-analysis_left) { order: -2; }
+  div.st-key-analysis_right > div:has(.analyst) { order: -1; }
+  .analysis-right { padding-top: clamp(40px, 4vw, 56px); border-top: 1px solid var(--line); }
 }
 @media (max-width: 520px) {
   .topnav-brand { font-size: 10px; letter-spacing: 0.2em; }
+  .brief-panel { padding: 26px 20px; }
   .topnav-links { gap: 18px; }
   .topnav-links a { font-size: 10px; letter-spacing: 0.16em; white-space: nowrap; }
   /* Tooltips anchored to their icon run off a phone screen (and, even hidden, widen the

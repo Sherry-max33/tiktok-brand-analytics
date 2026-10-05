@@ -53,46 +53,51 @@ _SCRIPT = """
     remember(el.dataset.revealKey);
     const caret = doc.createElement("span");
     caret.className = "ai-caret";
-    let index = 0, pos = 0, timer = null;
-    // Paced by total length so a whole block takes about TARGET_MS, however long it is.
-    const TARGET_MS = 1800, TICK_MS = 16, BLOCK_PAUSE_MS = 60;
+    let index = 0, pos = 0, frame = null;
+    // Paced by elapsed time, not by tick count (timers run late), so a whole block takes
+    // about TARGET_MS however long it is.
+    const TARGET_MS = 900;
     const total = parts.reduce((sum, part) => sum + part.text.length, 0);
-    const chunk = Math.max(6, Math.ceil(total / (TARGET_MS / TICK_MS)));
-    const blockOf = (part) => part.node.parentElement.closest(BLOCKS);
+    let shown = 0, started = null;
     const unhide = (node) => {
       for (let b = node.parentElement; b && b !== el; b = b.parentElement) b.classList.remove("ai-wait");
     };
     const finish = () => {
-      clearTimeout(timer);
+      win.cancelAnimationFrame(frame);
       parts.forEach((part) => { part.node.nodeValue = part.text; });
       el.querySelectorAll(".ai-wait").forEach((block) => block.classList.remove("ai-wait"));
       caret.remove();
       el.dataset.revealed = "done";
       el.removeEventListener("click", finish);
     };
-    const step = () => {
+    const step = (now) => {
       if (!el.isConnected) return;
+      if (started === null) started = now;
+      const goal = Math.ceil(total * Math.min(1, (now - started) / TARGET_MS));
+      let budget = goal - shown;
+      while (budget > 0 && index < parts.length) {
+        const part = parts[index];
+        if (pos === 0) {
+          unhide(part.node);
+          part.node.parentNode.insertBefore(caret, part.node.nextSibling);
+        }
+        let end = Math.min(part.text.length, pos + budget);
+        const space = part.text.indexOf(" ", end);
+        if (space !== -1 && space - end < 6) end = space + 1;
+        part.node.nodeValue = part.text.slice(0, end);
+        budget -= end - pos;
+        shown += end - pos;
+        pos = end;
+        if (pos >= part.text.length) {
+          index += 1;
+          pos = 0;
+        }
+      }
       if (index >= parts.length) return finish();
-      const part = parts[index];
-      if (pos === 0) {
-        unhide(part.node);
-        part.node.parentNode.insertBefore(caret, part.node.nextSibling);
-      }
-      let end = Math.min(part.text.length, pos + chunk + Math.floor(Math.random() * 4));
-      const space = part.text.indexOf(" ", end);
-      if (space !== -1 && space - end < 6) end = space + 1;
-      part.node.nodeValue = part.text.slice(0, end);
-      pos = end;
-      let delay = TICK_MS;
-      if (pos >= part.text.length) {
-        index += 1;
-        pos = 0;
-        if (index < parts.length && blockOf(parts[index]) !== blockOf(part)) delay = BLOCK_PAUSE_MS;
-      }
-      timer = setTimeout(step, delay);
+      frame = win.requestAnimationFrame(step);
     };
     el.addEventListener("click", finish);
-    step();
+    frame = win.requestAnimationFrame(step);
   }
 
   if (win.__aiReveal) {
