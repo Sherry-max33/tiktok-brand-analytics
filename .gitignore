@@ -19,8 +19,14 @@ data/processed/**
 !data/**/.gitkeep
 !data/**/README.md
 
-# Local demo recordings may show TikTok video frames; publish via YouTube, never the repo.
+# Local demo recordings and review shots may show TikTok video frames; never publish them.
 demo_media/
+.phase4-shots/
+
+# Local scratch and IDE state
+.virtual_documents/
+anaconda_projects/
+analysis.ipynb
 
 # OS
 .DS_Store
