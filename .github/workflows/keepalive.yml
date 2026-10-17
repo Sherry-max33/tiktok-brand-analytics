@@ -1,7 +1,11 @@
-name: Streamlit keepalive
+name: Keepalive
 
-# Streamlit Community Cloud sleeps apps after about 12 hours without a visit. A headless
-# browser visit every 3 hours keeps it warm; GitHub may start scheduled runs late.
+# Two targets:
+# 1) Supabase free tier pauses after ~7 days with no database activity — a read-only
+#    REST query keeps Postgres warm.
+# 2) Streamlit Community Cloud sleeps after ~12 hours without a visit — a headless
+#    browser session keeps the app warm. Home page only; never triggers AI generation.
+# GitHub may start scheduled runs late.
 on:
   schedule:
     - cron: "17 */3 * * *"
@@ -12,7 +16,21 @@ permissions:
   actions: write
 
 jobs:
-  visit:
+  supabase:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Query Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: python scripts/keepalive_supabase.py
+
+  streamlit:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
