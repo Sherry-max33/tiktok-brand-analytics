@@ -1,10 +1,12 @@
 """Video media slot shared by cards and the analysis page.
 
-Cards show a cover from assets/covers/ when one exists, otherwise a designed placeholder.
-Cards show TikTok's official preview image when available, looked up through oEmbed when
-the page renders (TIKTOK_OEMBED=0 turns it off).
-The Analysis page uses TikTok's official Embed Player (TIKTOK_EMBED=0 turns it off);
-TikTok video files and images are never downloaded, cached or re-hosted.
+Cards prefer TikTok's oEmbed thumbnail when the response still includes thumbnail_url.
+If that field is missing (TikTok's current oEmbed often only returns an iframe), the card
+falls back to the official Embed Player, muted and pointer-events-free so the card link
+still works. Local covers in assets/covers/ are used when present. Designed placeholders
+are last resort. The Analysis page uses the official Embed Player
+(TIKTOK_EMBED=0 / TIKTOK_OEMBED=0 turn each off). TikTok video files and images are never
+downloaded, cached or re-hosted.
 """
 
 from __future__ import annotations
@@ -86,6 +88,17 @@ def card_media(card: dict) -> str:
     media = card.get("media") or {}
     if media.get("kind") == "image" and media.get("src"):
         return f'<img src="{esc(media["src"])}" alt="{esc(card.get("title"))}" loading="lazy">'
+    embed = media.get("embed_url") or ""
+    if TIKTOK_EMBED_ENABLED and embed:
+        # TikTok oEmbed no longer consistently returns thumbnail_url; use the official
+        # player as the card visual instead of downloading or caching a cover.
+        src = embed + ("&" if "?" in embed else "?") + "autoplay=1&muted=1"
+        return (
+            f'<div class="preview-stack">{placeholder(card)}'
+            f'<iframe class="card-embed" src="{esc(src)}" title="" loading="lazy" '
+            f'allow="autoplay; encrypted-media; picture-in-picture" '
+            f'referrerpolicy="strict-origin-when-cross-origin"></iframe></div>'
+        )
     return placeholder(card)
 
 
