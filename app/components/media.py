@@ -92,11 +92,12 @@ def card_media(card: dict) -> str:
     if TIKTOK_EMBED_ENABLED and embed:
         # TikTok oEmbed no longer consistently returns thumbnail_url; use the official
         # player as the card visual instead of downloading or caching a cover.
-        src = embed + ("&" if "?" in embed else "?") + "autoplay=1&muted=1"
+        # No autoplay: show the player's poster frame only; the card link opens analysis.
+        src = embed + ("&" if "?" in embed else "?") + "autoplay=0&muted=1"
         return (
             f'<div class="preview-stack">{placeholder(card)}'
             f'<iframe class="card-embed" src="{esc(src)}" title="" loading="lazy" '
-            f'allow="autoplay; encrypted-media; picture-in-picture" '
+            f'allow="encrypted-media; picture-in-picture" '
             f'referrerpolicy="strict-origin-when-cross-origin"></iframe></div>'
         )
     return placeholder(card)
