@@ -18,7 +18,7 @@ import catalog
 from components.ai_insights import GENERATE_BRIEF_KEY, analyst_section, render_ai_script
 from components.html import esc, load_css, render
 from components.media import (
-    add_official_previews,
+    attach_list_previews,
     card_media,
     player,
     render_embed_script,
@@ -172,14 +172,17 @@ def _sim_card(card: dict) -> str:
     if embed_url:
         thumb = f"""
         <div class="sim-thumb">
-          {card_media(card)}
+          {card_media(card, allow_embed=False)}
           <button class="sim-play" type="button" data-embed="{esc(embed_url)}"
                   aria-label="Play video: {esc(card['title'])}">
             <span class="sim-play-icon"></span><span class="sim-play-label">Play video</span>
           </button>
         </div>"""
     else:
-        thumb = f'<a class="sim-thumb" href="{href}" target="_self">{card_media(card)}</a>'
+        thumb = (
+            f'<a class="sim-thumb" href="{href}" target="_self">'
+            f"{card_media(card, allow_embed=False)}</a>"
+        )
     return f"""
       <div class="sim-card">
         {thumb}
@@ -196,7 +199,7 @@ def _sim_card(card: dict) -> str:
 
 
 with st.spinner("Finding comparable high performers…"):
-    similar = add_official_previews(
+    similar = attach_list_previews(
         [dict(card) for card in ai_service.similar_cards(video["video_id"])]
     )
 if similar:

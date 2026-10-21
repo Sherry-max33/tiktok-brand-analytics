@@ -476,10 +476,11 @@ html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
 
 /* ---------- Results state (submitted search) ---------- */
 .results {
+  /* border-box: gutters stay inside max-width so the page does not spill past the viewport. */
   max-width: 1440px;
   margin: var(--nav-h) auto 0;
   padding: clamp(40px, 4.5vw, 64px) var(--gutter) clamp(72px, 8vw, 112px);
-  box-sizing: content-box;
+  box-sizing: border-box;
 }
 .results-count {
   font-size: 13px !important;

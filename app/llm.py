@@ -12,13 +12,13 @@ import os
 import time
 import urllib.error
 import urllib.request
-
-import catalog
+from pathlib import Path
 
 API_URL = "https://api.openai.com/v1/chat/completions"
 DEFAULT_MODEL = "gpt-4.1"
 TIMEOUT_S = 45
 DEFAULT_RETRIES = 0
+_REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 class LLMError(RuntimeError):
@@ -26,7 +26,7 @@ class LLMError(RuntimeError):
 
 
 def _env_file_value(name: str) -> str:
-    path = catalog.REPO_ROOT / ".env"
+    path = _REPO_ROOT / ".env"
     if not path.exists():
         return ""
     for line in path.read_text().splitlines():

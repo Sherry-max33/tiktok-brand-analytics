@@ -373,8 +373,13 @@ def fetch_videos_by_post_urls(
     actor_id: str = VIDEO_BY_URL_ACTOR_ID,
     api_token: Optional[str] = None,
     video_kv_store: Optional[str] = None,
+    max_request_retries: int = 0,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-    """Scrape specific TikTok post URLs; optionally download MP4s into Apify KV."""
+    """Scrape specific TikTok post URLs; optionally download MP4s into Apify KV.
+
+    ``max_request_retries`` defaults to 0: private / missing / sensitive posts almost
+    never succeed on retry, and each Cheerio reclaim still burns Apify credit.
+    """
     urls = [u.strip() for u in post_urls if u and str(u).strip()]
     if not urls:
         return [], {}
@@ -387,6 +392,8 @@ def fetch_videos_by_post_urls(
         "shouldDownloadSubtitles": False,
         "scrapeRelatedVideos": False,
         "downloadSubtitlesOptions": "NEVER_DOWNLOAD_SUBTITLES",
+        # Actor accepts this even when omitted from the published schema.
+        "maxRequestRetries": max(0, int(max_request_retries)),
     }
     if video_kv_store:
         run_input["videoKvStoreIdOrName"] = video_kv_store

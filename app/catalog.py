@@ -51,7 +51,9 @@ FEATURED_SLOTS = {
 }
 # Never shown on the homepage (still searchable).
 FEATURED_EXCLUDED = ("7598744349328854302",)
+# Homepage featured stays at FEATURED_COUNT (6). Search shows the top N matches.
 SEARCH_LIMIT = 20
+SEARCH_PAGE_SIZE = SEARCH_LIMIT  # alias used by older call sites
 
 # Hand-reviewed quality of the curated AI outputs (lower ranks first). Search results are
 # ordered by this tier before performance; unrated videos sit between "ok" and "not ok".

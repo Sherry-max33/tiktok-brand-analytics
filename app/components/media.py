@@ -1,12 +1,9 @@
 """Video media slot shared by cards and the analysis page.
 
-Cards prefer TikTok's oEmbed thumbnail when the response still includes thumbnail_url.
-If that field is missing (TikTok's current oEmbed often only returns an iframe), the card
-falls back to the official Embed Player, muted and pointer-events-free so the card link
-still works. Local covers in assets/covers/ are used when present. Designed placeholders
-are last resort. The Analysis page uses the official Embed Player
-(TIKTOK_EMBED=0 / TIKTOK_OEMBED=0 turn each off). TikTok video files and images are never
-downloaded, cached or re-hosted.
+List cards may show a ``preview`` image (oEmbed URL, local cover, or frame-thumb data URI).
+Pass ``allow_embed=False`` to skip the TikTok player iframe fallback (used by the
+frame-preview prototype). The Analysis page still uses the official Embed Player.
+(TIKTOK_EMBED=0 / TIKTOK_OEMBED=0 turn each off.)
 """
 
 from __future__ import annotations
@@ -76,7 +73,10 @@ def placeholder(card: dict, *, large: bool = False, note: str = "Preview") -> st
     )
 
 
-def card_media(card: dict) -> str:
+def card_media(card: dict, *, allow_embed: bool = False) -> str:
+    """Card visual for list grids. Default: never auto-mount a TikTok player iframe
+    (preview image or designed placeholder only). Pass ``allow_embed=True`` only if a
+    caller explicitly wants the legacy iframe fallback."""
     if card.get("preview"):
         # Empty alt: if the link has expired the image renders nothing and the placeholder
         # underneath shows through.
@@ -89,10 +89,7 @@ def card_media(card: dict) -> str:
     if media.get("kind") == "image" and media.get("src"):
         return f'<img src="{esc(media["src"])}" alt="{esc(card.get("title"))}" loading="lazy">'
     embed = media.get("embed_url") or ""
-    if TIKTOK_EMBED_ENABLED and embed:
-        # TikTok oEmbed no longer consistently returns thumbnail_url; use the official
-        # player as the card visual instead of downloading or caching a cover.
-        # No autoplay: show the player's poster frame only; the card link opens analysis.
+    if allow_embed and TIKTOK_EMBED_ENABLED and embed:
         src = embed + ("&" if "?" in embed else "?") + "autoplay=0&muted=1"
         return (
             f'<div class="preview-stack">{placeholder(card)}'
@@ -101,6 +98,46 @@ def card_media(card: dict) -> str:
             f'referrerpolicy="strict-origin-when-cross-origin"></iframe></div>'
         )
     return placeholder(card)
+
+
+def attach_list_previews(cards: list[dict]) -> list[dict]:
+    """Fill ``card['preview']`` for list pages without oEmbed or TikTok iframes.
+
+    When R2 is configured: covers come only from R2 (local Apify/cache mirror, else
+    presigned URL). No Drive frame fallback. Otherwise: Supabase cover store → frames.
+    """
+    try:
+        from cover_store import configured as cloud_configured
+        from cover_store import r2_configured
+        from cover_store import try_cover_preview
+    except ImportError:
+        cloud_configured = lambda: False  # noqa: E731
+        r2_configured = lambda: False  # noqa: E731
+        try_cover_preview = None
+
+    if cloud_configured() and try_cover_preview is not None:
+        for card in cards:
+            vid = str(card.get("video_id") or "")
+            if not vid or card.get("preview"):
+                continue
+            src = try_cover_preview(vid)
+            if src:
+                card["preview"] = src
+        # R2 is the cutover source of truth — do not dilute with Drive frames.
+        if r2_configured():
+            return cards
+
+    try:
+        from frame_thumbs import attach_frame_previews, frames_root
+    except ImportError:
+        return cards
+    root = frames_root()
+    if not root.is_dir():
+        return cards
+    missing = [c for c in cards if not c.get("preview")]
+    if missing:
+        attach_frame_previews(missing)
+    return cards
 
 
 def click_to_play_url(card: dict) -> str:

@@ -6,6 +6,7 @@ __pycache__/
 .dist/
 build/
 .venv/
+.venv_app/
 .env
 .streamlit/secrets.toml
 .ipynb_checkpoints/
@@ -22,6 +23,9 @@ data/processed/**
 # Local demo recordings and review shots may show TikTok video frames; never publish them.
 demo_media/
 .phase4-shots/
+
+# Resized frame thumbnails / local visual review pages (never commit).
+.cache/
 
 # Local scratch and IDE state
 .virtual_documents/

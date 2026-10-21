@@ -19,7 +19,7 @@ from components.builder import render_builder_script
 from components.featured import render_featured, render_footer, render_how_it_works
 from components.hero import render_hero
 from components.html import load_css
-from components.media import add_official_previews
+from components.media import attach_list_previews
 from components.navbar import render_navbar
 from components.results import render_results
 
@@ -47,11 +47,13 @@ render_navbar()
 
 if state["q"] or any(state[key] for key in catalog.FACET_KEYS):
     cards, total = catalog.search_videos(
-        state["q"], **{key: state[key] for key in catalog.FACET_KEYS}
+        state["q"],
+        **{key: state[key] for key in catalog.FACET_KEYS},
+        limit=catalog.SEARCH_LIMIT,
     )
     render_results(
         state,
-        add_official_previews(cards),
+        attach_list_previews(cards),
         total,
         options,
         library_size=catalog.library_size(),
@@ -59,7 +61,10 @@ if state["q"] or any(state[key] for key in catalog.FACET_KEYS):
     )
 else:
     render_hero(options)
-    render_featured(add_official_previews(catalog.featured_videos()), catalog.library_size())
+    render_featured(
+        attach_list_previews(catalog.featured_videos()),
+        catalog.library_size(),
+    )
     render_how_it_works(catalog.library_size())
 
 render_builder_script(catalog.facet_combinations())
